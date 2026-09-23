@@ -54,22 +54,26 @@ function buildUrl(path: string, query?: RequestOptions['query']): string {
 
 /**
  * Thin fetch wrapper: JSON in, JSON out, backend errors normalised to ApiError.
- * Authentication tokens are attached from localStorage once the auth phase
- * lands — the hook below is the single place that will need to change.
+ *
+ * `FormData` bodies bypass JSON serialisation entirely — the browser must set
+ * the multipart boundary itself, so the Content-Type header is left off for
+ * uploads (see `api.upload`). Authentication tokens are attached from
+ * localStorage once the auth phase lands — this is the single place to change.
  */
 export async function apiRequest<T>(path: string, options: RequestOptions = {}): Promise<T> {
   const { body, query, absoluteUrl, headers, ...rest } = options;
   const token = typeof localStorage !== 'undefined' ? localStorage.getItem('outreachos.token') : null;
+  const isFormData = typeof FormData !== 'undefined' && body instanceof FormData;
 
   const response = await fetch(absoluteUrl ?? buildUrl(path, query), {
     ...rest,
     headers: {
       Accept: 'application/json',
-      ...(body ? { 'Content-Type': 'application/json' } : {}),
+      ...(body && !isFormData ? { 'Content-Type': 'application/json' } : {}),
       ...(token ? { Authorization: `Token ${token}` } : {}),
       ...headers,
     },
-    ...(body ? { body: JSON.stringify(body) } : {}),
+    ...(body ? { body: isFormData ? body : JSON.stringify(body) } : {}),
   });
 
   if (response.status === 204) return undefined as T;
@@ -88,6 +92,9 @@ export const api = {
   get: <T>(path: string, options?: RequestOptions) =>
     apiRequest<T>(path, { ...options, method: 'GET' }),
   post: <T>(path: string, body?: unknown, options?: RequestOptions) =>
+    apiRequest<T>(path, { ...options, method: 'POST', body }),
+  /** Multipart POST — used for CSV/XLSX uploads. */
+  upload: <T>(path: string, body: FormData, options?: RequestOptions) =>
     apiRequest<T>(path, { ...options, method: 'POST', body }),
   patch: <T>(path: string, body?: unknown, options?: RequestOptions) =>
     apiRequest<T>(path, { ...options, method: 'PATCH', body }),

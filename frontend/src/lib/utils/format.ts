@@ -77,6 +77,16 @@ export function initialsFromName(name: string): string {
   return parts.map((part) => part.charAt(0).toUpperCase()).join('') || '?';
 }
 
+/** 1536 -> "1.5 KB" — file sizes on the import screens. */
+export function formatBytes(bytes: number, fractionDigits = 1): string {
+  if (!Number.isFinite(bytes) || bytes <= 0) return '0 B';
+  const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+  const index = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1);
+  const value = bytes / 1024 ** index;
+  const digits = index === 0 ? 0 : fractionDigits;
+  return `${value.toFixed(digits)} ${units[index]}`;
+}
+
 export function formatDuration(seconds: number): string {
   if (seconds < 60) return `${Math.round(seconds)}s`;
   const minutes = Math.floor(seconds / 60);

@@ -5,6 +5,7 @@ export const paths = {
   companies: '/companies',
   contacts: '/contacts',
   imports: '/imports',
+  importsHistory: '/imports/history',
   campaigns: '/campaigns',
   email: '/email',
   followUps: '/follow-ups',

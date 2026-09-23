@@ -11,6 +11,9 @@ drf-spectacular==0.30.0
 # Database driver — PostgreSQL
 psycopg[binary]==3.3.6
 
+# Spreadsheet parsing — XLSX import (CSV uses the standard library)
+openpyxl==3.1.5
+
 # Background processing — Redis broker + Celery workers
 celery==5.6.3
 redis==8.1.0

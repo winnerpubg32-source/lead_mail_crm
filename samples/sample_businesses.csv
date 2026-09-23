@@ -1,0 +1,15 @@
+Business_Name,Contact Person,Job Title,Corporate Email,Mobile,Company Website,Industry,Address,City,State,ZIP,Employees,Notes
+"Northwind Logistics, Inc.",Marcus Whitfield,VP Operations,m.whitfield@northwindlogistics.com,(614) 555-0142,https://www.northwindlogistics.com,Transportation & Logistics,1200 Meridian Plaza,Columbus,OH,43215,850,"Existing customer, priority"
+Brightline Dental Group,Elena Ruiz,Managing Partner,elena.ruiz@brightlinedental.com,813-555-0188,brightlinedental.com/contact,Healthcare,88 Bayshore Blvd,Tampa,FL,33606,"40-60",Warm lead
+Vertex Precision Manufacturing,Dale Kowalski,Plant Manager,d.kowalski@vertexprecision.com,+1 616 555 0119,www.vertexprecision.com,Manufacturing,4100 Kraft Ave SE,Grand Rapids,MI,49508,320,
+Harborview Accounting LLP,Priya Raman,Senior Partner,p.raman@harborviewcpa.com,917-555-0173,harborviewcpa.com,Professional Services,55 Hudson Yards,New York,NY,10001,120,
+Cascade Brewing Co.,Tomas Lindqvist,Head Brewer,tomas@cascadebrewing.com,503-555-0121,cascadebrewing.com,Food & Beverage,2150 NW Quimby St,Portland,OR,97210,75,
+Summit Peak Wealth,Barbara Osei,Principal Advisor,b.osei@summitpeakwealth.com,(303) 555-0155,https://summitpeakwealth.com,Financial Services,1660 Lincoln St,Denver,CO,80264,45,
+Redwood Property Group,,,info@redwoodpropertygroup.com,415-555-0190,redwoodpropertygroup.com,Real Estate,1 Market St,San Francisco,CA,94105,210,No named contact
+Ironclad Security Systems,Kwame Mensah,Director of Sales,k.mensah@ironcladsecurity.com,404-555-0134,ironcladsecurity.com,Security,3300 Peachtree Rd NE,Atlanta,GA,30326,140,
+Bluewater Marine Supply,Sofia Marchetti,Purchasing Manager,not-an-email,305-555-0166,bluewatermarine.com,Retail,900 Biscayne Blvd,Miami,FL,33132,65,"Bad address, fix later"
+Copperfield Legal Partners,Anders Nilsson,Partner,a.nilsson@copperfieldlegal.com,206-555-0177,copperfieldlegal.com,Legal Services,1201 3rd Ave,Seattle,WA,98101,95,
+"Northwind Logistics, Inc.",Marcus Whitfield,VP Operations,m.whitfield@northwindlogistics.com,(614) 555-0142,https://www.northwindlogistics.com,Transportation & Logistics,1200 Meridian Plaza,Columbus,OH,43215,850,"Duplicate of row 2 — same domain and e-mail"
+Lakeshore Medical Billing,Renee Dubois,Operations Lead,renee.dubois@lakeshorebilling.com,312-555-0143,lakeshorebilling.com,Healthcare,200 W Madison St,Chicago,IL,60606,58,
+,Unknown Person,Analyst,orphan@nowhere.com,555-000-0000,,Unknown,,,,,,"Rejected row: no business name"
+Pinecrest Landscaping,Gary Boone,Owner,gary@pinecrestlandscaping.net,720-555-0129,pinecrestlandscaping.net,Home Services,7800 E Union Ave,Denver,CO,80237,22,

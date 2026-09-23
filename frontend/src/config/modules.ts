@@ -18,24 +18,11 @@ export interface ModuleConfig {
 
 /**
  * Registry for the modules that still render the shared placeholder page.
- * Leads, Companies and Contacts were implemented in Phase 2 and now have real
- * pages (`src/pages/{LeadsPage,CompaniesPage,ContactsPage}.tsx`).
+ * Leads, Companies and Contacts were implemented in Phase 2 and Imports in
+ * Phase 3 — all four now have real pages under `src/pages/` instead of an
+ * entry here.
  */
 export const dataColumns = {
-  imports: {
-    title: 'Imports',
-    description:
-      'Ingestion runs for large CSV and XLSX business datasets, with column mapping and row-level error reporting.',
-    capabilities: [
-      'Upload with automatic column mapping and preview of the first rows',
-      'Background processing in chunks via Celery — files of hundreds of thousands of rows',
-      'Row-level validation errors with downloadable error report',
-      'Idempotent re-imports and rollback of a failed run',
-    ],
-    columns: ['File', 'Rows', 'Processed', 'Failed', 'Status', 'Started', 'Duration', 'Uploaded by'],
-    apiPath: '/api/v1/imports/',
-    djangoApp: 'imports',
-  },
   campaigns: {
     title: 'Campaigns',
     description:

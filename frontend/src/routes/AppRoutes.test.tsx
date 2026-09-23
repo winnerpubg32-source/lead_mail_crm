@@ -38,9 +38,20 @@ vi.mock('@/services/health.service', () => ({
   fetchHealth: vi.fn().mockRejectedValue(new Error('offline')),
 }));
 
+// The imports screens fetch from the API — mocked so the router test stays offline.
+vi.mock('@/services/imports.service', async () => {
+  const actual = await vi.importActual<typeof import('@/services/imports.service')>(
+    '@/services/imports.service',
+  );
+  return {
+    ...actual,
+    fetchImportJobs: vi.fn().mockResolvedValue({ count: 0, next: null, previous: null, results: [] }),
+    fetchSystemFields: vi.fn().mockResolvedValue([]),
+  };
+});
+
 // Modules that still render the shared placeholder page.
 const placeholderRoutes: Array<[string, string]> = [
-  ['/imports', 'Imports'],
   ['/campaigns', 'Campaigns'],
   ['/email', 'Email'],
   ['/follow-ups', 'Follow-ups'],
@@ -59,6 +70,33 @@ describe('routing', () => {
       await screen.findByRole('heading', { level: 1, name: heading }),
     ).toBeInTheDocument();
     expect(screen.getByText(/ships in a future phase/i)).toBeInTheDocument();
+  });
+
+  it('renders the imports upload screen', async () => {
+    renderWithProviders(<AppRoutes />, { route: '/imports' });
+
+    expect(await screen.findByRole('heading', { level: 1, name: 'Imports' })).toBeInTheDocument();
+    expect(screen.getByText('Drag & drop your file here')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /import history/i })).toHaveAttribute(
+      'href',
+      '/imports/history',
+    );
+  });
+
+  it('renders the import history page', async () => {
+    renderWithProviders(<AppRoutes />, { route: '/imports/history' });
+
+    expect(
+      await screen.findByRole('heading', { level: 1, name: 'Import history' }),
+    ).toBeInTheDocument();
+    expect(await screen.findByText('No imports yet')).toBeInTheDocument();
+  });
+
+  it('marks the lead database modules as live in the sidebar', () => {
+    renderWithProviders(<AppRoutes />, { route: '/imports' });
+
+    // No "ships in a future phase" hint belongs to a shipped module.
+    expect(screen.queryByText(/ships in a future phase/i)).not.toBeInTheDocument();
   });
 
   it('renders the settings page with the theme switcher', async () => {

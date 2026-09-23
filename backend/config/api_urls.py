@@ -42,4 +42,5 @@ urlpatterns = [
         "contacts/", include(("apps.contacts.urls", "contacts_legacy"), namespace="contacts_legacy")
     ),
     path("leads/", include(("apps.leads.urls", "leads_legacy"), namespace="leads_legacy")),
+    path("imports/", include(("apps.imports.urls", "imports_legacy"), namespace="imports_legacy")),
 ]

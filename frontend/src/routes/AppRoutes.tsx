@@ -10,6 +10,9 @@ import { paths } from '@/routes/paths';
 /**
  * Route table with code-split pages.
  *
+ * Phase 3: `/imports` (upload, mapping, preview, progress) and
+ * `/imports/history` are real, API-backed screens.
+ *
  * Phase 2: `/leads`, `/companies` and `/contacts` are real, API-backed tables.
  * `/dashboard` is backed by the analytics endpoint (placeholder dataset until
  * that endpoint exists), and the remaining modules render the shared placeholder
@@ -30,6 +33,12 @@ const CompaniesPage = lazy(() =>
 );
 const ContactsPage = lazy(() =>
   import('@/pages/ContactsPage').then((module) => ({ default: module.ContactsPage })),
+);
+const ImportsPage = lazy(() =>
+  import('@/pages/ImportsPage').then((module) => ({ default: module.ImportsPage })),
+);
+const ImportHistoryPage = lazy(() =>
+  import('@/pages/ImportHistoryPage').then((module) => ({ default: module.ImportHistoryPage })),
 );
 const ModulePage = lazy(() =>
   import('@/pages/ModulePlaceholderPage').then((module) => ({ default: module.ModulePage })),
@@ -78,10 +87,27 @@ export function AppRoutes() {
           }
         />
 
+        {/* Imports — implemented (Phase 3) */}
+        <Route
+          path={paths.imports}
+          element={
+            <Suspense fallback={<TablePageSkeleton />}>
+              <ImportsPage />
+            </Suspense>
+          }
+        />
+        <Route
+          path={paths.importsHistory}
+          element={
+            <Suspense fallback={<TablePageSkeleton />}>
+              <ImportHistoryPage />
+            </Suspense>
+          }
+        />
+
         {/* Later-phase modules — each renders the shared placeholder */}
         {(
           [
-            [paths.imports, 'imports'],
             [paths.campaigns, 'campaigns'],
             [paths.email, 'email'],
             [paths.followUps, 'follow-ups'],

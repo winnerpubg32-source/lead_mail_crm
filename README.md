@@ -1,6 +1,6 @@
 # OutreachOS
 
-**B2B Lead Outreach & CRM SaaS — Phase 1 foundation + Phase 2 lead database.**
+**B2B Lead Outreach & CRM SaaS — Phase 1 foundation, Phase 2 lead database, Phase 3 data import.**
 
 OutreachOS will eventually import large business datasets (names, contacts, e-mails,
 phone numbers, websites, industries, cities, states), qualify leads, generate
@@ -8,10 +8,12 @@ personalised B2B outreach e-mails, deliver them over SMTP with a hard limit of
 **90 marketing e-mails per day**, and manage the resulting conversations in a CRM.
 
 This repository currently contains **Phase 1 (project foundation and the
-dashboard) and Phase 2 (the Leads / Companies / Contacts database)**. The
-business database is real and queryable: PostgreSQL models, DRF list/detail
-APIs with search, filtering and ordering, and three database-backed pages.
-Import, outreach, AI and CRM business logic are still deliberately absent.
+dashboard), Phase 2 (the Leads / Companies / Contacts database) and Phase 3
+(CSV/XLSX data import)**. The business database is real and queryable — PostgreSQL
+models, DRF list/detail APIs with search, filtering and ordering, three
+database-backed pages — and it can now be filled from real datasets: upload,
+intelligent column mapping, preview, chunked Celery processing and an import
+history. Outreach, AI and CRM business logic are still deliberately absent.
 
 ---
 
@@ -19,6 +21,7 @@ Import, outreach, AI and CRM business logic are still deliberately absent.
 
 - [What is included in Phase 1](#what-is-included-in-phase-1)
 - [What is included in Phase 2](#what-is-included-in-phase-2)
+- [What is included in Phase 3](#what-is-included-in-phase-3)
 - [Tech stack](#tech-stack)
 - [Quick start (Docker Compose)](#quick-start-docker-compose)
 - [Local development without Docker](#local-development-without-docker)
@@ -26,6 +29,7 @@ Import, outreach, AI and CRM business logic are still deliberately absent.
 - [Environment variables](#environment-variables)
 - [API reference](#api-reference)
 - [Phase 2 — the lead database](#phase-2--lead-database-leads--companies--contacts)
+- [Phase 3 — data import](#phase-3--data-import-imports)
 - [Frontend architecture](#frontend-architecture)
 - [Testing & quality gates](#testing--quality-gates)
 - [Roadmap](#roadmap)
@@ -77,6 +81,40 @@ Automated verification at the end of Phase 2:
 ```
 backend   121 Django tests passing · ruff check + format clean · manage.py check clean
 frontend  34 Vitest tests passing · tsc -b clean · eslint clean · vite build clean
+```
+
+---
+
+## What is included in Phase 3
+
+| Area | Status |
+| --- | --- |
+| **CSV + XLSX uploads** — content-based type detection (a renamed file is still rejected), 100 MB cap, per-sheet analysis of workbooks | ✅ Done |
+| **Intelligent column mapping** — normalised exact match → alias/synonym table → fuzzy matching (no AI), with per-column confidence and manual overrides | ✅ Done |
+| **Preview before import** — total rows, rows with/without e-mail, potential duplicates, invalid e-mails, first 50 rows, and the full SOURCE COLUMN → SYSTEM FIELD table | ✅ Done |
+| **Background processing** — `ImportJob` + Celery (`imports.run_import_job`), CSV streamed in chunks of 500 rows, XLSX in batches; nothing is loaded fully into memory | ✅ Done |
+| **Data quality** — e-mail + phone + website + company/name + address normalisation, e-mail syntax validation, invalid addresses dropped with a row warning, rows **without** an e-mail still stored, missing e-mails never invented | ✅ Done |
+| **Idempotent merging** — companies matched on domain (`normalized_website`) then name, contacts on company + e-mail then name, leads on company + contact; re-importing the same file adds nothing and reports the rows as duplicates | ✅ Done |
+| **Result screen** — “Import completed” with Total / Imported / Duplicates / Invalid / Missing Email (+ new companies, new contacts, errors) | ✅ Done |
+| **Import history** — every run with its row counts, status filter and delete | ✅ Done |
+| **`ImportJob` fields** — `id`, `filename`, `status`, `total_rows`, `processed_rows`, `valid_rows`, `invalid_rows`, `duplicate_rows`, `error_rows`, `started_at`, `completed_at` (+ provenance, analysis and issues) | ✅ Done |
+| E-mail sending, AI, campaigns, scoring | ⛔ Later phases |
+
+Automated verification at the end of Phase 3:
+
+```
+backend   205 Django tests passing · ruff check + format clean · manage.py check clean
+frontend  51 Vitest tests passing · tsc -b clean · eslint clean · vite build clean
+```
+
+End-to-end proof against the running stack (`samples/sample_businesses.csv`,
+14 messy real-world rows):
+
+```
+upload  → 14 rows detected, 5 columns mapped (exact/alias/fuzzy), 1 invalid e-mail flagged
+start   → dispatched to Celery, job QUEUED → PROCESSING → COMPLETED in 0.09 s
+result  → Total 14 · Imported 12 · Duplicates 1 · Invalid 1 · Missing email 1
+re-run  → Total 14 · Imported 0 · Duplicates 13 · Invalid 1   (idempotent)
 ```
 
 ---
@@ -219,7 +257,7 @@ lead_mail_crm/
 │   │   ├── companies/                # ✅ Company model + read-only API + filters
 │   │   ├── contacts/                 # ✅ Contact model + read-only API + filters
 │   │   ├── leads/                    # ✅ Lead model + API, vocabulary, seed command
-│   │   ├── imports/                  # ⛔ registered, routed, empty
+│   │   ├── imports/                  # ✅ ImportJob + mapping/parsers/analysis/services + API
 │   │   ├── campaigns/                # ⛔ registered, routed, empty
 │   │   ├── email_engine/             # ⛔ registered, routed, empty
 │   │   ├── ai_engine/                # ⛔ registered, routed, empty
@@ -240,18 +278,20 @@ lead_mail_crm/
 │   │   │   └── feedback/             # EmptyState, ErrorState, LoadingState, ErrorBoundary
 │   │   ├── features/dashboard/       # dashboard-specific components
 │   │   ├── features/leads/           # LeadTable (9 columns), table page skeleton
-│   │   ├── pages/                    # Dashboard, Leads, Companies, Contacts, Settings, placeholders, 404
+│   │   ├── features/imports/         # dropzone, file summary, mapping table, preview, progress, result
+│   │   ├── pages/                    # Dashboard, Leads, Companies, Contacts, Imports, Import history, Settings, placeholders, 404
 │   │   ├── routes/                   # AppRoutes (lazy-loaded), paths.ts
 │   │   ├── services/                 # data access — dashboard mock ↔ API switch, real lead APIs
-│   │   ├── hooks/                    # useLeads/useCompanies/useContacts, list query state, theme, …
+│   │   ├── hooks/                    # useLeads/useCompanies/useContacts/useImports, list query state, theme, …
 │   │   ├── data/mock/                # dashboard placeholder dataset (UI only)
 │   │   ├── config/                   # navigation, module registry, status maps, colours
 │   │   ├── lib/                      # api client, env access, formatting, query client
-│   │   └── types/                    # API + dashboard + lead/company/contact contracts
+│   │   └── types/                    # API + dashboard + lead/company/contact/import contracts
 │   ├── nginx/default.conf            # production SPA + /api proxy
 │   ├── Dockerfile                    # development + build + production targets
 │   └── vite.config.ts · vitest.config.ts · eslint.config.js
 │
+├── samples/                          # sample_businesses.csv · .xlsx — messy fixtures used by the import tests
 ├── docker-compose.yml                # frontend · backend · postgres · redis (+ workers profile)
 ├── .env.example                      # every supported variable, documented
 ├── Makefile                          # developer shortcuts
@@ -348,6 +388,25 @@ Lead statuses: `NEW`, `QUALIFIED`, `CONTACTED`, `REPLIED`, `MEETING`,
 Development data: `python manage.py seed_lead_data` (add `--flush` to reset,
 `--flush --empty` to leave the tables empty and exercise the empty states).
 
+### Phase 3 — data import (`/api/v1/imports/`, alias `/api/imports/`)
+
+| Method | Endpoint | Description |
+| --- | --- | --- |
+| `GET` | `/api/v1/imports/` | Import history — paginated; `status`, `file_type`, `with_errors`, `search`, `ordering` |
+| `GET` | `/api/v1/imports/{id}/` | One job with its preview (counts, mapping, first 50 rows, issues) |
+| `POST` | `/api/v1/imports/upload/` | Multipart upload (`file`, optional `sheet`) — analyses immediately, returns the detected mapping + preview |
+| `GET` | `/api/v1/imports/fields/` | The 20 system fields with their aliases and hints (for the mapping UI) |
+| `POST` | `/api/v1/imports/{id}/mapping/` | Apply manual mapping changes, returns the recomputed preview |
+| `POST` | `/api/v1/imports/{id}/start/` | Confirm the mapping and queue the run (Celery); accepts a `column_mapping` override |
+| `GET` | `/api/v1/imports/{id}/status/` | Small polling payload — status + progress + summary |
+| `POST` | `/api/v1/imports/{id}/cancel/` | Discard a queued upload and its stored file (`204`, job deleted) |
+| `DELETE` | `/api/v1/imports/{id}/` | Same as cancel, used by the history page |
+
+Rows are written through the imports service layer (the leads/companies/contacts
+viewsets stay read-only), always with provenance: `source="import:<file>"`,
+`source_file` and `source_row_number`. Sample datasets used for the tests live in
+`samples/`.
+
 Errors always use one envelope:
 
 ```json
@@ -394,9 +453,9 @@ active, and the settings page reports which data source is in use.
 
 ### Routes
 
-`/dashboard` · `/leads` · `/companies` · `/contacts` · `/imports` · `/campaigns` ·
-`/email` · `/follow-ups` · `/crm` · `/analytics` · `/templates` · `/ai` ·
-`/suppression` · `/settings`
+`/dashboard` · `/leads` · `/companies` · `/contacts` · `/imports` ·
+`/imports/history` · `/campaigns` · `/email` · `/follow-ups` · `/crm` ·
+`/analytics` · `/templates` · `/ai` · `/suppression` · `/settings`
 
 `/dashboard` is functional, `/settings` is a small but real surface (theme, UI
 preferences, API connectivity diagnostics), and `/leads`, `/companies` and
@@ -425,17 +484,24 @@ cd frontend && npm run lint          # ESLint (React 19 rules)
 cd frontend && npm run build
 ```
 
-Current state: **121 Django tests**, **34 frontend tests**, typecheck, lint and
+Current state: **205 Django tests**, **51 frontend tests**, typecheck, lint and
 build all pass.
 
 Backend tests cover health/readiness, auth, the normalization helpers, model
-constraints, the seed command and every list/detail/filter/ordering behaviour of
-the leads, companies and contacts APIs.
+constraints, the seed command, every list/detail/filter/ordering behaviour of the
+leads, companies and contacts APIs, and the whole import pipeline: header
+normalisation and file-type detection, the mapping engine (exact/alias/fuzzy,
+row-identifier guard), row building and normalisation, preview analysis with
+batched duplicate lookups, the chunked runner (progress, merging, idempotency,
+per-row fallback), the Celery wiring and the full HTTP round-trip including the
+guard rails.
 
 Frontend tests cover the dashboard (KPI cards, `0 / 90` capacity, all five
-required sections, empty states, error + retry), every route in the sidebar, and
-the three database-backed pages (columns, rows, search, filters, pagination,
-empty/error states).
+required sections, empty states, error + retry), every route in the sidebar, the
+three database-backed pages (columns, rows, search, filters, pagination,
+empty/error states) and the import screens (drag & drop, file metadata, sheets,
+preview numbers, mapping edits, progress polling, the completed screen, cancel
+and the history page).
 
 ---
 
@@ -443,10 +509,7 @@ empty/error states).
 
 Later phases, in the order the codebase is prepared for them:
 
-1. **Data ingestion** — extend `imports`: CSV/XLSX upload, column mapping,
-   chunked Celery processing, deduplication into the `companies` / `contacts` /
-   `leads` tables that Phase 2 already provides.
-2. **Qualification** — lead scoring and AI-assisted qualification (`ai_engine`).
+1. **Qualification** — lead scoring and AI-assisted qualification (`ai_engine`).
 3. **Campaigns & sending** — sequences, SMTP mailboxes, the enforced
    **90 e-mails/day** budget, bounce handling (`campaigns`, `email_engine`,
    `suppression`).
@@ -454,10 +517,10 @@ Later phases, in the order the codebase is prepared for them:
 5. **Analytics** — aggregation tables feeding the dashboard cards (`analytics`),
    with the dashboard switching to the live API via `VITE_USE_MOCK_DATA=false`.
 
-Deliberately **not** implemented yet: CSV/XLSX import, SMTP sending, AI
-generation, campaign execution, lead scoring and CRM automation. `lead_score`
-exists as a stored integer on `Lead` (0–100, settable via API/seed) — there is no
-scoring algorithm behind it.
+Deliberately **not** implemented yet: SMTP sending, AI generation, campaign
+execution, lead scoring and CRM automation. `lead_score` exists as a stored
+integer on `Lead` (0–100, settable via API/seed) — there is no scoring algorithm
+behind it.
 
 ---
 
