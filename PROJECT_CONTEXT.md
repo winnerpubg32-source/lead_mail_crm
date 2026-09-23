@@ -319,3 +319,116 @@ Supporting pieces:
 * `tsc --noEmit` — clean.
 * `npm run build` — production build succeeds (LeadDetailPage chunk: 13 kB gzipped 4 kB).
 * `npm test` (Vitest) — **49 tests** all passing, including the updated LeadsPage test covering all new columns.
+
+---
+
+## Phase 6 Implementation
+
+Phase 6 ships **Campaign Management** and **Email Templates**. It validates
+and prepares outreach campaigns against the lead database but does **not**
+send real e-mails — SMTP delivery is deferred to Phase 7, per the brief.
+
+### New models
+
+| Model | App | Purpose |
+| --- | --- | --- |
+| `Campaign` | `campaigns` | name, description, industry, sub_industry, location, minimum_lead_score, daily_limit, status (DRAFT/READY/RUNNING/PAUSED/COMPLETED/CANCELLED), template FK, scheduled start/end, recommended_service, sent/reply/meeting counters, eligible_count (cached audience snapshot). |
+| `CampaignLead` | `campaigns` | Audience membership join table with send_status (PENDING/QUEUED/SENT/REPLIED/BOUNCED/SKIPPED) and timestamps. `(campaign, lead)` is unique. |
+| `EmailTemplate` | `email_engine` | name, description, subject, body, default_recommended_service, plus derived helpers `used_variables` / `unknown_variables` / `missing_variables` / `render_preview`. |
+
+### Migrations
+
+* `campaigns/migrations/0001_initial.py` — `Campaign` + `CampaignLead` + indexes.
+* `email_engine/migrations/0001_initial.py` — `EmailTemplate`.
+
+### Template engine
+
+Supported variables (validated, documented in `/api/v1/email/templates/variables/`):
+
+    {{first_name}}, {{contact_name}}, {{company_name}}, {{industry}},
+    {{city}}, {{state}}, {{website}}, {{recommended_service}}
+
+Unknown variables are flagged in the API response and in the UI. Subject and
+body are rendered server-side via `render_template`, with a sample lead used
+for previews. Inline preview is available for editor-as-you-type.
+
+### Campaign services
+
+* `eligible_leads_qs(campaign)` — applies audience filters (industry,
+  sub_industry icontains, location OR-matched against city/state/country,
+  minimum_lead_score, deliverable e-mail, not MERGED).
+* `count_eligible_leads(campaign)` — cheap `COUNT`.
+* `validate_campaign_for_launch(campaign)` — returns a list of human-readable
+  errors (name length, daily limit, template required, scheduled end > start,
+  non-empty audience).
+* `prepare_campaign(campaign)` — transactional; validates, snapshots eligible
+  leads into `CampaignLead` (PENDING), sets `eligible_count`, transitions to
+  READY.
+* `transition_campaign(campaign, new_status)` — enforces allowed transitions;
+  DRAFT→RUNNING auto-prepares. Phase 6 never creates `EmailMessage` rows or
+  calls SMTP.
+
+### Backend APIs
+
+| Method | Endpoint | Description |
+| --- | --- | --- |
+| `GET` | `/api/v1/campaigns/` | Paginated list (search + status filter + sort). |
+| `POST` | `/api/v1/campaigns/` | Create draft. |
+| `GET` | `/api/v1/campaigns/{id}/` | Detail (with template, membership count). |
+| `PATCH` | `/api/v1/campaigns/{id}/` | Update (wizard saves). |
+| `DELETE` | `/api/v1/campaigns/{id}/` | Cancel (blocked while RUNNING/PAUSED) and delete. |
+| `POST` | `/api/v1/campaigns/{id}/status/` | Transition status (DRAFT→READY→RUNNING→PAUSED→…). |
+| `POST` | `/api/v1/campaigns/{id}/prepare/` | Validate + snapshot audience; response confirms no e-mails are sent. |
+| `GET` | `/api/v1/campaigns/{id}/preview-audience/` | Paginated leads currently matching the audience rules. |
+| `GET` | `/api/v1/campaigns/{id}/members/` | Paginated `CampaignLead` rows. |
+| `GET` | `/api/v1/campaigns/{id}/validate/` | Live `valid`, `errors`, `eligible_count` for the wizard. |
+| `GET` | `/api/v1/campaigns/statuses/` | Enum vocabulary with per-status counts. |
+| `GET` | `/api/v1/email/templates/` | List templates. |
+| `POST` | `/api/v1/email/templates/` | Create template. |
+| `GET`/`PATCH`/`DELETE` | `/api/v1/email/templates/{id}/` | Retrieve/update/delete. |
+| `POST` | `/api/v1/email/templates/{id}/preview/` | Render template against optional context. |
+| `POST` | `/api/v1/email/templates/preview-inline/` | Render an unsaved subject/body blob (editor live preview). |
+| `GET` | `/api/v1/email/templates/variables/` | Supported variable list + sample lead. |
+
+A backward-compat `ping` endpoint is kept at `/api/v1/{campaigns,email}/ping`
+so the existing core health-check test passes.
+
+### Frontend
+
+| Route | Page | Description |
+| --- | --- | --- |
+| `/campaigns` | `CampaignsPage` | Table: Campaign, Audience chips, Eligible Leads, Daily Limit, Sent, Replies, Status. Toolbar search + status filter. Empty states + New campaign button. |
+| `/campaigns/:id` | `CampaignDetailPage` | Header with lifecycle actions (Prepare / Launch dry-run / Pause / Resume / Cancel / Complete), stat tiles, progress bar, audience + delivery details, template preview. |
+| `/templates` | `TemplatesPage` | Template cards grid with New/Edit/Delete. |
+| Modal | `CampaignWizard` | 5-step wizard: Audience → Service → Template → Schedule → Review. Save on step 4; final step "Launch" calls the prepare endpoint (no e-mails sent). |
+| Component | `TemplateEditor` | Two-pane editor with variable-tag chips, unknown-variable warnings, and live preview rendered against sample lead data (client-side for instant feedback). |
+| Component | `Progress` | Minimal shared progress bar (added to the UI kit for tables + cards). |
+
+Supporting files:
+* `types/campaign.ts` — `Campaign`, `EmailTemplate`, `CampaignMember`, status types, wizard draft.
+* `services/campaigns.service.ts` — typed CRUD + status/prepare/validate/audience/members + templates + preview.
+* `hooks/useCampaigns.ts` — TanStack Query hooks + mutations with automatic cache invalidation.
+* `config/status.ts` — `campaignStatusConfig` with both Phase 6 UPPERCASE and dashboard-mock lowercase keys.
+* `config/navigation.ts` — `/campaigns` and `/templates` marked `live`.
+
+### Tests performed
+
+* `python manage.py check` — 0 issues.
+* New migrations apply cleanly.
+* **312 backend tests passing** (up from 297). New tests cover:
+  * template variable rendering, unknown-variable detection,
+  * campaign creation, validation errors (missing template),
+  * eligible-lead audience filtering by industry/minimum_lead_score,
+  * prepare-endpoint audience snapshot + READY transition,
+  * RUNNING transition without sending (counters stay 0),
+  * list, statuses, validate, preview-audience endpoints.
+* `tsc --noEmit` clean.
+* `npm run build` succeeds; new chunks: CampaignsPage, CampaignDetailPage, CampaignWizard, TemplatesPage.
+* `npm test` (Vitest) — **47 tests passing**; campaigns/templates routes removed from placeholder tests and mocked to stay offline.
+
+### Non-goals (Phase 7+)
+
+* Real SMTP delivery, per-mailbox configuration, daily send-budget enforcement.
+* Campaign steps / sequences beyond a single template.
+* Open/click tracking, bounce/complaint webhooks, automatic STOP-ON-REPLY.
+* Variable personalization via the AI engine.

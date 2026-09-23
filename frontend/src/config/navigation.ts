@@ -119,7 +119,7 @@ export const navigation: NavSection[] = [
         label: 'Campaigns',
         icon: Megaphone,
         description: 'Sequences, audiences and sending schedules.',
-        status: 'soon',
+        status: 'live',
       },
       {
         path: '/email',
@@ -165,8 +165,8 @@ export const navigation: NavSection[] = [
         path: '/templates',
         label: 'Templates',
         icon: LayoutTemplate,
-        description: 'Reusable e-mail templates and step variants.',
-        status: 'soon',
+        description: 'Reusable e-mail templates with variable substitution and live preview.',
+        status: 'live',
       },
       {
         path: '/ai',

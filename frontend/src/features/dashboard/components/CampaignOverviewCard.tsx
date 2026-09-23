@@ -11,14 +11,6 @@ import { cn } from '@/lib/utils/cn';
 import { formatDate, formatPercent } from '@/lib/utils/format';
 import type { CampaignSummary } from '@/types/dashboard';
 
-const progressTone: Record<CampaignSummary['status'], 'brand' | 'emerald' | 'amber' | 'sky'> = {
-  active: 'emerald',
-  paused: 'amber',
-  scheduled: 'sky',
-  completed: 'brand',
-  draft: 'brand',
-};
-
 export interface CampaignOverviewCardProps {
   campaigns: CampaignSummary[];
   className?: string;
@@ -78,9 +70,8 @@ export function CampaignOverviewCard({ campaigns, className }: CampaignOverviewC
                 <div className="mt-2 flex items-center gap-3">
                   <Progress
                     value={campaign.progress}
-                    tone={progressTone[campaign.status]}
                     size="sm"
-                    label={`${campaign.name} progress`}
+                    aria-label={`${campaign.name} progress`}
                     className="flex-1"
                   />
                   <span className="tabular w-9 text-right text-[11.5px] text-subtle">

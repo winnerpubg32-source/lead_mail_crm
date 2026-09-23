@@ -17,5 +17,5 @@ export type { BadgeTone } from './Badge';
 export type { ButtonProps } from './Button';
 export type { ButtonSize, ButtonVariant } from './button-variants';
 export type { PaginationProps } from './Pagination';
-export type { ProgressTone } from './Progress';
+export type { ProgressProps } from './Progress';
 export type { FilterSelectConfig, TableToolbarProps } from './TableToolbar';

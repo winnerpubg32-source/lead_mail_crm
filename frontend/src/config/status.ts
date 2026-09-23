@@ -2,8 +2,9 @@ import { Ban, CheckCheck, CircleSlash, Mail, MailCheck, MailWarning, Send, Spark
 import type { LucideIcon } from 'lucide-react';
 
 import type { BadgeTone } from '@/components/ui/Badge';
-import type { CampaignStatus, OutreachEventType } from '@/types/dashboard';
+import type { OutreachEventType } from '@/types/dashboard';
 import type { EmailStatus, LeadStatus, PhoneType, ScoreClassification } from '@/types/lead';
+import type { CampaignStatus as CampaignStatusCode } from '@/types/campaign';
 
 /**
  * Presentation metadata for every domain enum.
@@ -42,6 +43,22 @@ export const emailStatusConfig: Record<EmailStatus, StatusPresentation> = {
   SUPPRESSED: { label: 'Suppressed', tone: 'neutral' },
 };
 
+/** Campaign lifecycle badges (Phase 6). */
+export const campaignStatusConfig: Record<CampaignStatusCode | string, StatusPresentation> = {
+  DRAFT: { label: 'Draft', tone: 'neutral' },
+  READY: { label: 'Ready', tone: 'info' },
+  RUNNING: { label: 'Running', tone: 'success' },
+  PAUSED: { label: 'Paused', tone: 'warning' },
+  COMPLETED: { label: 'Completed', tone: 'brand' },
+  CANCELLED: { label: 'Cancelled', tone: 'neutral' },
+  // Legacy lowercase keys used by the dashboard mock data.
+  draft: { label: 'Draft', tone: 'neutral' },
+  scheduled: { label: 'Scheduled', tone: 'info' },
+  active: { label: 'Active', tone: 'success' },
+  paused: { label: 'Paused', tone: 'warning' },
+  completed: { label: 'Completed', tone: 'brand' },
+};
+
 export const phoneTypeLabels: Record<PhoneType, string> = {
   UNKNOWN: 'Unknown',
   MOBILE: 'Mobile',
@@ -62,14 +79,6 @@ export const primaryLeadStatusOrder: LeadStatus[] = [
   'LOST',
   'DO_NOT_CONTACT',
 ];
-
-export const campaignStatusConfig: Record<CampaignStatus, StatusPresentation> = {
-  draft: { label: 'Draft', tone: 'neutral' },
-  scheduled: { label: 'Scheduled', tone: 'info' },
-  active: { label: 'Active', tone: 'success' },
-  paused: { label: 'Paused', tone: 'warning' },
-  completed: { label: 'Completed', tone: 'brand' },
-};
 
 export interface OutreachEventPresentation extends StatusPresentation {
   icon: LucideIcon;

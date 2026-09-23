@@ -51,7 +51,7 @@ export function ImportProgressCard({ job }: { job: ImportJob }) {
       <div className="space-y-4 px-5 py-4">
         <Progress
           value={percent}
-          label="Import progress"
+          aria-label="Import progress"
           className="h-2.5"
         />
 

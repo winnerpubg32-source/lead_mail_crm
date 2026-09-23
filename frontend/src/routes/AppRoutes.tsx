@@ -52,6 +52,15 @@ const DuplicatesPage = lazy(() =>
 const MissingEmailPage = lazy(() =>
   import('@/pages/MissingEmailPage').then((module) => ({ default: module.MissingEmailPage })),
 );
+const CampaignsPage = lazy(() =>
+  import('@/pages/CampaignsPage').then((module) => ({ default: module.CampaignsPage })),
+);
+const CampaignDetailPage = lazy(() =>
+  import('@/pages/CampaignDetailPage').then((module) => ({ default: module.CampaignDetailPage })),
+);
+const TemplatesPage = lazy(() =>
+  import('@/pages/TemplatesPage').then((module) => ({ default: module.TemplatesPage })),
+);
 const ModulePage = lazy(() =>
   import('@/pages/ModulePlaceholderPage').then((module) => ({ default: module.ModulePage })),
 );
@@ -151,15 +160,39 @@ export function AppRoutes() {
           }
         />
 
+        {/* Campaigns + templates — implemented in Phase 6 */}
+        <Route
+          path={paths.campaigns}
+          element={
+            <Suspense fallback={<TablePageSkeleton />}>
+              <CampaignsPage />
+            </Suspense>
+          }
+        />
+        <Route
+          path={paths.campaignDetail}
+          element={
+            <Suspense fallback={<TablePageSkeleton />}>
+              <CampaignDetailPage />
+            </Suspense>
+          }
+        />
+        <Route
+          path={paths.templates}
+          element={
+            <Suspense fallback={<TablePageSkeleton />}>
+              <TemplatesPage />
+            </Suspense>
+          }
+        />
+
         {/* Later-phase modules — each renders the shared placeholder */}
         {(
           [
-            [paths.campaigns, 'campaigns'],
             [paths.email, 'email'],
             [paths.followUps, 'follow-ups'],
             [paths.crm, 'crm'],
             [paths.analytics, 'analytics'],
-            [paths.templates, 'templates'],
             [paths.ai, 'ai'],
             [paths.suppression, 'suppression'],
           ] as const

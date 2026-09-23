@@ -50,14 +50,56 @@ vi.mock('@/services/imports.service', async () => {
   };
 });
 
+// Phase 6: campaigns/templates live screens fetch on mount.
+vi.mock('@/services/campaigns.service', async () => {
+  const actual = await vi.importActual<typeof import('@/services/campaigns.service')>(
+    '@/services/campaigns.service',
+  );
+  return {
+    ...actual,
+    fetchCampaigns: vi.fn().mockResolvedValue({ count: 0, next: null, previous: null, results: [] }),
+    fetchCampaignStatuses: vi.fn().mockResolvedValue({
+      campaign_status: [],
+      default_daily_limit: 90,
+      total: 0,
+    }),
+    fetchTemplates: vi.fn().mockResolvedValue([]),
+    fetchTemplateVariables: vi.fn().mockResolvedValue({
+      supported_variables: [],
+      sample_lead: {},
+    }),
+    fetchCampaign: vi.fn().mockResolvedValue(null),
+  };
+});
+vi.mock('@/services/leads.service', async () => {
+  const actual = await vi.importActual<typeof import('@/services/leads.service')>(
+    '@/services/leads.service',
+  );
+  return {
+    ...actual,
+    fetchLeadStatuses: vi.fn().mockResolvedValue({
+      lead_status: [],
+      email_status: [],
+      total: 0,
+      defaults: { lead_status: 'NEW', email_status: 'UNKNOWN' },
+    }),
+    fetchLeadFilterOptions: vi.fn().mockResolvedValue({
+      industries: [],
+      sub_industries: [],
+      cities: [],
+      states: [],
+      sources: [],
+      score_points: {},
+    }),
+  };
+});
+
 // Modules that still render the shared placeholder page.
 const placeholderRoutes: Array<[string, string]> = [
-  ['/campaigns', 'Campaigns'],
   ['/email', 'Email'],
   ['/follow-ups', 'Follow-ups'],
   ['/crm', 'CRM'],
   ['/analytics', 'Analytics'],
-  ['/templates', 'Templates'],
   ['/ai', 'AI'],
   ['/suppression', 'Suppression'],
 ];

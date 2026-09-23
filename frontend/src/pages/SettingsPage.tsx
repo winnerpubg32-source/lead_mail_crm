@@ -139,7 +139,7 @@ export function SettingsPage() {
                     {sent} / {limit}
                   </span>
                 </div>
-                <Progress value={usage} className="mt-2" label="Daily sending usage" />
+                <Progress value={usage} className="mt-2" aria-label="Daily sending usage" />
                 <p className="mt-2 text-[11.5px] text-subtle">
                   {Math.max(0, limit - sent)} sends remaining today · counts reset at midnight in the
                   workspace timezone.
