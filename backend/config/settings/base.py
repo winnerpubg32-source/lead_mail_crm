@@ -257,23 +257,31 @@ CELERY_TASK_DEFAULT_QUEUE = env("CELERY_TASK_DEFAULT_QUEUE", default="outreachos
 CELERY_TASK_TIME_LIMIT = env.int("CELERY_TASK_TIME_LIMIT", default=600)
 CELERY_TASK_SOFT_TIME_LIMIT = env.int("CELERY_TASK_SOFT_TIME_LIMIT", default=540)
 CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP = True
-# Phase 1 has no scheduled jobs yet; periodic tasks (daily counter reset, import
-# polling) are added together with the features that need them.
+# The dispatcher only fans out messages whose scheduled_at has arrived. The
+# one-minute beat cadence keeps the sending window smooth without requiring a
+# separate scheduler service.
+CELERY_BEAT_SCHEDULE = {
+    "dispatch-due-email-messages": {
+        "task": "email_engine.dispatch_due_email_messages",
+        "schedule": 60.0,
+    },
+}
 
 # ---------------------------------------------------------------------------
 # OutreachOS domain configuration
 # ---------------------------------------------------------------------------
-# Guard rails from the product brief. Consumed by the dashboard today, enforced
-# by the email engine in a later phase.
+# The global hard guard rail is enforced by DailyEmailUsage reservations.
 OUTREACH_DAILY_EMAIL_LIMIT = env.int("OUTREACH_DAILY_EMAIL_LIMIT", default=90)
 OUTREACH_TIMEZONE = env("OUTREACH_TIMEZONE", default="UTC")
+OUTREACH_SENDING_START_TIME = env("OUTREACH_SENDING_START_TIME", default="09:00")
+OUTREACH_SENDING_END_TIME = env("OUTREACH_SENDING_END_TIME", default="17:00")
 
 # ---------------------------------------------------------------------------
 # E-mail
 # ---------------------------------------------------------------------------
 # Marketing e-mail delivery (SMTP credentials, throttling) is intentionally not
 # implemented in Phase 1 — the console backend keeps the foundation runnable.
-EMAIL_BACKEND = env("EMAIL_BACKEND", default="django.core.mail.backends.console.EmailBackend")
+EMAIL_BACKEND = env("EMAIL_BACKEND", default="django.core.mail.backends.smtp.EmailBackend")
 EMAIL_HOST = env("EMAIL_HOST", default="")
 EMAIL_PORT = env.int("EMAIL_PORT", default=587)
 EMAIL_HOST_USER = env("EMAIL_HOST_USER", default="")

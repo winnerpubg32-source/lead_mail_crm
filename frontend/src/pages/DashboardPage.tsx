@@ -15,6 +15,7 @@ import { DashboardSkeleton } from '@/features/dashboard/components/DashboardSkel
 import { PipelineOverviewCard } from '@/features/dashboard/components/PipelineOverviewCard';
 import { RecentLeadsCard } from '@/features/dashboard/components/RecentLeadsCard';
 import { TodaysOutreachCard } from '@/features/dashboard/components/TodaysOutreachCard';
+import { useDailyEmailUsage } from '@/hooks/useCampaigns';
 import { useDashboardOverview } from '@/hooks/useDashboardOverview';
 import { useDocumentTitle } from '@/hooks/useDocumentTitle';
 import { env } from '@/lib/env';
@@ -40,6 +41,7 @@ export function DashboardPage() {
   useDocumentTitle('Dashboard');
   const [range, setRange] = useState<RangeOption>('today');
   const { data, isPending, isError, error, refetch, isFetching } = useDashboardOverview();
+  const { data: emailUsage } = useDailyEmailUsage(!env.useMockData);
 
   const header = (
     <PageHeader
@@ -125,8 +127,7 @@ export function DashboardPage() {
     );
   }
 
-  const overview = data;
-  if (!overview) {
+  if (!data) {
     return (
       <>
         {header}
@@ -134,6 +135,28 @@ export function DashboardPage() {
       </>
     );
   }
+
+  const overview = emailUsage
+    ? {
+        ...data,
+        capacity: {
+          ...data.capacity,
+          sent: emailUsage.sent_today,
+          limit: emailUsage.limit,
+          remaining: emailUsage.remaining,
+          queued: emailUsage.queued,
+          failed: emailUsage.failed,
+          windowLabel: emailUsage.window_label,
+        },
+        metrics: data.metrics.map((metric) =>
+          metric.id === 'emails-sent-today'
+            ? { ...metric, value: emailUsage.sent_today, displayValue: String(emailUsage.sent_today) }
+            : metric.id === 'daily-capacity'
+              ? { ...metric, value: emailUsage.limit, displayValue: `${emailUsage.sent_today} / ${emailUsage.limit}` }
+              : metric,
+        ),
+      }
+    : data;
 
   return (
     <>

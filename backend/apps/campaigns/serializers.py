@@ -7,7 +7,6 @@ from rest_framework import serializers
 from apps.campaigns.models import Campaign, CampaignLead, CampaignStatus
 from apps.campaigns.services import (
     count_eligible_leads,
-    eligible_leads_qs,
     validate_campaign_for_launch,
 )
 from apps.email_engine.models import EmailTemplate
@@ -59,6 +58,8 @@ class CampaignSerializer(serializers.ModelSerializer):
             "template_name",
             "scheduled_start_at",
             "scheduled_end_at",
+            "sending_start_time",
+            "sending_end_time",
             "daily_limit",
             "status",
             "status_display",
@@ -99,13 +100,17 @@ class CampaignSerializer(serializers.ModelSerializer):
         if obj.eligible_count == 0:
             return 0
         sent = obj.sent_count or 0
-        pct = int(round(sent * 100 / obj.eligible_count))
+        pct = round(sent * 100 / obj.eligible_count)
         return min(100, max(0, pct))
 
     def validate_template(self, value):
-        if value is not None:
-            if not EmailTemplate.objects.filter(pk=value.pk if hasattr(value, "pk") else value).exists():
-                raise serializers.ValidationError("Selected template does not exist.")
+        if (
+            value is not None
+            and not EmailTemplate.objects.filter(
+                pk=value.pk if hasattr(value, "pk") else value
+            ).exists()
+        ):
+            raise serializers.ValidationError("Selected template does not exist.")
         return value
 
     def validate_daily_limit(self, value: int) -> int:
@@ -125,7 +130,7 @@ class CampaignListSerializer(CampaignSerializer):
     audience_size = serializers.SerializerMethodField()
 
     class Meta(CampaignSerializer.Meta):
-        fields = CampaignSerializer.Meta.fields + ("audience_size",)
+        fields = (*CampaignSerializer.Meta.fields, "audience_size")
 
     def get_audience_size(self, obj) -> int:
         # Use cached eligible_count for READY+ campaigns; otherwise compute live.
@@ -139,7 +144,7 @@ class CampaignDetailSerializer(CampaignSerializer):
     memberships = serializers.SerializerMethodField()
 
     class Meta(CampaignSerializer.Meta):
-        fields = CampaignSerializer.Meta.fields + ("template_detail", "memberships")
+        fields = (*CampaignSerializer.Meta.fields, "template_detail", "memberships")
 
     def get_template_detail(self, obj):
         if not obj.template_id:
@@ -160,12 +165,16 @@ class CampaignWizardSerializer(serializers.Serializer):
     industry = serializers.CharField(required=False, allow_blank=True, max_length=120)
     sub_industry = serializers.CharField(required=False, allow_blank=True, max_length=120)
     location = serializers.CharField(required=False, allow_blank=True, max_length=120)
-    minimum_lead_score = serializers.IntegerField(required=False, min_value=0, max_value=100, default=0)
+    minimum_lead_score = serializers.IntegerField(
+        required=False, min_value=0, max_value=100, default=0
+    )
     recommended_service = serializers.CharField(required=False, allow_blank=True, max_length=180)
     template = serializers.IntegerField(required=False, allow_null=True)
     template_data = serializers.DictField(required=False, allow_null=True)
     scheduled_start_at = serializers.DateTimeField(required=False, allow_null=True)
     scheduled_end_at = serializers.DateTimeField(required=False, allow_null=True)
+    sending_start_time = serializers.TimeField(required=False, allow_null=True)
+    sending_end_time = serializers.TimeField(required=False, allow_null=True)
     daily_limit = serializers.IntegerField(required=False, min_value=1, max_value=10000, default=90)
 
 

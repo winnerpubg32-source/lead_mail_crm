@@ -81,6 +81,16 @@ services:
       CELERY_BROKER_URL: redis://redis:6379/1
       CELERY_RESULT_BACKEND: redis://redis:6379/2
       OUTREACH_DAILY_EMAIL_LIMIT: ${OUTREACH_DAILY_EMAIL_LIMIT:-90}
+      OUTREACH_TIMEZONE: ${OUTREACH_TIMEZONE:-UTC}
+      OUTREACH_SENDING_START_TIME: ${OUTREACH_SENDING_START_TIME:-09:00}
+      OUTREACH_SENDING_END_TIME: ${OUTREACH_SENDING_END_TIME:-17:00}
+      EMAIL_BACKEND: ${EMAIL_BACKEND:-django.core.mail.backends.smtp.EmailBackend}
+      EMAIL_HOST: ${EMAIL_HOST:-}
+      EMAIL_PORT: ${EMAIL_PORT:-587}
+      EMAIL_HOST_USER: ${EMAIL_HOST_USER:-}
+      EMAIL_HOST_PASSWORD: ${EMAIL_HOST_PASSWORD:-}
+      EMAIL_USE_TLS: ${EMAIL_USE_TLS:-true}
+      DEFAULT_FROM_EMAIL: ${DEFAULT_FROM_EMAIL:-OutreachOS <no-reply@outreachos.local>}
       DJANGO_LOG_LEVEL: ${DJANGO_LOG_LEVEL:-INFO}
     volumes:
       # Live reload against the host source tree; the named volume keeps the
@@ -150,6 +160,17 @@ services:
       REDIS_URL: redis://redis:6379/0
       CELERY_BROKER_URL: redis://redis:6379/1
       CELERY_RESULT_BACKEND: redis://redis:6379/2
+      OUTREACH_DAILY_EMAIL_LIMIT: ${OUTREACH_DAILY_EMAIL_LIMIT:-90}
+      OUTREACH_TIMEZONE: ${OUTREACH_TIMEZONE:-UTC}
+      OUTREACH_SENDING_START_TIME: ${OUTREACH_SENDING_START_TIME:-09:00}
+      OUTREACH_SENDING_END_TIME: ${OUTREACH_SENDING_END_TIME:-17:00}
+      EMAIL_BACKEND: ${EMAIL_BACKEND:-django.core.mail.backends.smtp.EmailBackend}
+      EMAIL_HOST: ${EMAIL_HOST:-}
+      EMAIL_PORT: ${EMAIL_PORT:-587}
+      EMAIL_HOST_USER: ${EMAIL_HOST_USER:-}
+      EMAIL_HOST_PASSWORD: ${EMAIL_HOST_PASSWORD:-}
+      EMAIL_USE_TLS: ${EMAIL_USE_TLS:-true}
+      DEFAULT_FROM_EMAIL: ${DEFAULT_FROM_EMAIL:-OutreachOS <no-reply@outreachos.local>}
     volumes:
       - ./backend:/app
     depends_on:
@@ -179,6 +200,17 @@ services:
       REDIS_URL: redis://redis:6379/0
       CELERY_BROKER_URL: redis://redis:6379/1
       CELERY_RESULT_BACKEND: redis://redis:6379/2
+      OUTREACH_DAILY_EMAIL_LIMIT: ${OUTREACH_DAILY_EMAIL_LIMIT:-90}
+      OUTREACH_TIMEZONE: ${OUTREACH_TIMEZONE:-UTC}
+      OUTREACH_SENDING_START_TIME: ${OUTREACH_SENDING_START_TIME:-09:00}
+      OUTREACH_SENDING_END_TIME: ${OUTREACH_SENDING_END_TIME:-17:00}
+      EMAIL_BACKEND: ${EMAIL_BACKEND:-django.core.mail.backends.smtp.EmailBackend}
+      EMAIL_HOST: ${EMAIL_HOST:-}
+      EMAIL_PORT: ${EMAIL_PORT:-587}
+      EMAIL_HOST_USER: ${EMAIL_HOST_USER:-}
+      EMAIL_HOST_PASSWORD: ${EMAIL_HOST_PASSWORD:-}
+      EMAIL_USE_TLS: ${EMAIL_USE_TLS:-true}
+      DEFAULT_FROM_EMAIL: ${DEFAULT_FROM_EMAIL:-OutreachOS <no-reply@outreachos.local>}
     volumes:
       - ./backend:/app
     depends_on:

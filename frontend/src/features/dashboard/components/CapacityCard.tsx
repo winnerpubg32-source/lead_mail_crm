@@ -3,6 +3,7 @@ import { AlertTriangle, Clock, MailWarning, Send } from 'lucide-react';
 import { CapacityGauge } from '@/components/charts/CapacityGauge';
 import { MiniBarChart } from '@/components/charts/MiniBarChart';
 import { Card, CardHeader } from '@/components/ui/Card';
+import { Progress } from '@/components/ui/Progress';
 import { cn } from '@/lib/utils/cn';
 import { formatNumber } from '@/lib/utils/format';
 import type { DailyCapacityData } from '@/types/dashboard';
@@ -80,6 +81,14 @@ export function CapacityCard({ capacity, className }: CapacityCardProps) {
               <span className="text-2xl font-semibold text-fg">{formatNumber(capacity.remaining)}</span>
               <span className="text-[12.5px] text-muted">of {formatNumber(capacity.limit)} sends</span>
             </p>
+          </div>
+
+          <div>
+            <div className="mb-1 flex items-center justify-between text-[11px] font-medium uppercase tracking-wide text-subtle">
+              <span>Daily progress</span>
+              <span className="tabular">{Math.round(Math.max(0, Math.min(1, usedRatio)) * 100)}%</span>
+            </div>
+            <Progress value={usedRatio * 100} size="sm" aria-label="Daily e-mail sending progress" />
           </div>
 
           <dl className="grid grid-cols-3 gap-3">

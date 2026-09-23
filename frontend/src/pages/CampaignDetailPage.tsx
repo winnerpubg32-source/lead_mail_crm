@@ -127,7 +127,7 @@ export function CampaignDetailPage() {
             <Megaphone className="size-5 text-brand-500" />
             <h2 className="text-base font-semibold text-fg">{campaign.name}</h2>
             <Badge tone={status.tone} size="sm" dot>{status.label}</Badge>
-            <Badge tone="warning" size="sm">Phase 6 · no emails sent</Badge>
+            <Badge tone="info" size="sm">SMTP delivery enabled</Badge>
           </div>
 
           <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
@@ -173,6 +173,7 @@ export function CampaignDetailPage() {
                 ['Recommended service', campaign.recommended_service || '—'],
                 ['Scheduled start', campaign.scheduled_start_at ? formatDateTime(campaign.scheduled_start_at) : 'As soon as approved'],
                 ['Scheduled end', campaign.scheduled_end_at ? formatDateTime(campaign.scheduled_end_at) : '—'],
+                ['Sending window', `${campaign.sending_start_time?.slice(0, 5) ?? '09:00'} – ${campaign.sending_end_time?.slice(0, 5) ?? '17:00'}`],
               ]}
             />
           </div>

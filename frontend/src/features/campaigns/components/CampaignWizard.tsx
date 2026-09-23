@@ -7,7 +7,13 @@ import { Card } from '@/components/ui/Card';
 import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
 import { Textarea } from '@/components/ui/Textarea';
-import { useCreateCampaign, usePrepareCampaign, useTemplates, useUpdateCampaign } from '@/hooks/useCampaigns';
+import {
+  useCampaignStatus,
+  useCreateCampaign,
+  usePrepareCampaign,
+  useTemplates,
+  useUpdateCampaign,
+} from '@/hooks/useCampaigns';
 import { toast } from '@/lib/utils/toast';
 import type { Campaign, CampaignWizardDraft, EmailTemplate } from '@/types/campaign';
 
@@ -37,11 +43,14 @@ const DEFAULTS: CampaignWizardDraft = {
   daily_limit: 90,
   scheduled_start_at: null,
   scheduled_end_at: null,
+  sending_start_time: '09:00',
+  sending_end_time: '17:00',
 };
 
 export function CampaignWizard({ existing, onClose, onCreated }: Props) {
   const isEdit = Boolean(existing);
   const [step, setStep] = useState(1);
+  const [savedCampaign, setSavedCampaign] = useState<Campaign | null>(existing ?? null);
   const [draft, setDraft] = useState<CampaignWizardDraft>(() =>
     existing
       ? {
@@ -56,6 +65,8 @@ export function CampaignWizard({ existing, onClose, onCreated }: Props) {
           daily_limit: existing.daily_limit,
           scheduled_start_at: existing.scheduled_start_at,
           scheduled_end_at: existing.scheduled_end_at,
+          sending_start_time: existing.sending_start_time?.slice(0, 5) ?? '09:00',
+          sending_end_time: existing.sending_end_time?.slice(0, 5) ?? '17:00',
         }
       : DEFAULTS,
   );
@@ -63,6 +74,7 @@ export function CampaignWizard({ existing, onClose, onCreated }: Props) {
   const create = useCreateCampaign();
   const update = useUpdateCampaign();
   const prepare = usePrepareCampaign();
+  const setStatus = useCampaignStatus();
 
   const set = <K extends keyof CampaignWizardDraft>(key: K, value: CampaignWizardDraft[K]) => {
     setDraft((prev) => ({ ...prev, [key]: value }));
@@ -80,6 +92,7 @@ export function CampaignWizard({ existing, onClose, onCreated }: Props) {
       // Persist before review.
       try {
         const saved = await persist();
+        setSavedCampaign(saved);
         onCreated?.(saved);
         setStep(5);
       } catch (err) {
@@ -95,22 +108,23 @@ export function CampaignWizard({ existing, onClose, onCreated }: Props) {
   const launch = async () => {
     try {
       let campaign: Campaign;
-      if (isEdit && existing) {
-        await update.mutateAsync({ id: existing.id, patch: draft });
-        campaign = existing;
+      if (savedCampaign) {
+        campaign = savedCampaign;
       } else {
         campaign = await create.mutateAsync(draft);
+        setSavedCampaign(campaign);
         onCreated?.(campaign);
       }
       const result = await prepare.mutateAsync(campaign.id);
-      toast.success(result.message);
+      await setStatus.mutateAsync({ id: campaign.id, status: 'RUNNING' });
+      toast.success(`${result.eligible_count} messages queued for SMTP delivery.`);
       onClose();
     } catch (err) {
       toast.error((err as Error).message || 'Could not prepare campaign');
     }
   };
 
-  const isPending = create.isPending || update.isPending || prepare.isPending;
+  const isPending = create.isPending || update.isPending || prepare.isPending || setStatus.isPending;
 
   return (
     <div className="fixed inset-0 z-40 bg-black/40 p-4 backdrop-blur-sm">
@@ -124,7 +138,7 @@ export function CampaignWizard({ existing, onClose, onCreated }: Props) {
               Step {step} of {STEPS.length} — {STEPS[step - 1].description}
             </p>
           </div>
-          <Badge tone="warning" size="sm" dot>Phase 6 · no emails sent yet</Badge>
+          <Badge tone="info" size="sm" dot>SMTP delivery enabled</Badge>
         </div>
 
         <ol className="flex items-center gap-2 border-b border-border-subtle bg-surface-1/50 px-5 py-3">
@@ -321,6 +335,20 @@ function ScheduleStep({ draft, set }: StepProps) {
             onChange={(e) => set('scheduled_end_at', e.target.value ? new Date(e.target.value).toISOString() : null)}
           />
         </Field>
+        <Field label="Sending starts">
+          <Input
+            type="time"
+            value={draft.sending_start_time ?? '09:00'}
+            onChange={(e) => set('sending_start_time', e.target.value || null)}
+          />
+        </Field>
+        <Field label="Sending ends">
+          <Input
+            type="time"
+            value={draft.sending_end_time ?? '17:00'}
+            onChange={(e) => set('sending_end_time', e.target.value || null)}
+          />
+        </Field>
       </div>
     </div>
   );
@@ -337,11 +365,12 @@ function ReviewStep({ draft, existing, templates }: { draft: CampaignWizardDraft
       <SummaryRow label="Service" value={draft.recommended_service || '—'} />
       <SummaryRow label="Template" value={template?.name ?? 'None selected'} />
       <SummaryRow label="Daily limit" value={`${draft.daily_limit} emails/day`} />
+      <SummaryRow label="Sending window" value={`${draft.sending_start_time ?? '09:00'} – ${draft.sending_end_time ?? '17:00'}`} />
       {existing?.eligible_count ? (
         <SummaryRow label="Eligible (existing)" value={String(existing.eligible_count)} />
       ) : null}
-      <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-[12.5px] text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200">
-        <strong>Phase 6 — dry run:</strong> Launching validates the campaign and snapshots the audience but does <strong>not</strong> send emails. SMTP delivery ships in Phase 7.
+      <div className="rounded-lg border border-sky-200 bg-sky-50 p-3 text-[12.5px] text-sky-800 dark:border-sky-500/30 dark:bg-sky-500/10 dark:text-sky-200">
+        <strong>SMTP delivery:</strong> Launching creates queued messages and workers distribute them throughout this sending window while enforcing the 90-per-day workspace limit.
       </div>
     </div>
   );

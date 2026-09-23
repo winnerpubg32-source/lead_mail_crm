@@ -19,7 +19,7 @@ import { useListQuery } from '@/hooks/useListQuery';
 import { formatNumber } from '@/lib/utils/format';
 
 /**
- * Campaigns list (Phase 6).
+ * Campaigns list with the Phase 7 SMTP delivery lifecycle.
  *
  * Columns: Campaign, Audience, Eligible Leads, Daily Limit, Sent, Replies, Status.
  * Create/Edit wizard walks through Audience → Service → Template → Schedule → Review.
@@ -47,10 +47,10 @@ export function CampaignsPage() {
       <PageHeader
         eyebrow="Outreach"
         title="Campaigns"
-        description="Audience, template and schedule for every outreach sequence. Phase 6 prepares campaigns — Phase 7 sends them."
+        description="Audience, template and sending window for every SMTP outreach sequence."
         actions={
           <>
-            <Badge tone="warning" size="sm" dot>Phase 6 · prep only</Badge>
+            <Badge tone="info" size="sm" dot>SMTP delivery</Badge>
             <Button
               variant="outline"
               size="sm"

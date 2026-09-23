@@ -179,9 +179,8 @@ class CampaignApiTests(TestCase):
         self.assertFalse(resp.json()["valid"])
         self.assertTrue(any("template" in e for e in resp.json()["errors"]))
 
-    def test_running_transition_records_no_send(self) -> None:
-        """Phase 6: transition to RUNNING must NOT actually send anything —
-        memberships are snapshotted, counters stay at 0."""
+    def test_running_transition_queues_without_sending_synchronously(self) -> None:
+        """Launching queues delivery work; SMTP remains asynchronous and counters start at 0."""
         c = Campaign.objects.create(
             name="Launch", industry="Manufacturing", minimum_lead_score=70, daily_limit=50, template=self.tpl
         )

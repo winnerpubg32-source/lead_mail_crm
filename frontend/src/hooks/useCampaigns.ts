@@ -1,5 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
+import { emailKeys, fetchDailyEmailUsage } from '@/services/email.service';
+
 import {
   campaignKeys,
   createCampaign,
@@ -196,5 +198,15 @@ export function usePreviewInline(subject: string, body: string) {
     staleTime: 1000,
     refetchOnWindowFocus: false,
     retry: false,
+  });
+}
+
+export function useDailyEmailUsage(enabled = true) {
+  return useQuery({
+    queryKey: emailKeys.usage(),
+    queryFn: fetchDailyEmailUsage,
+    enabled,
+    refetchInterval: 30_000,
+    staleTime: 10_000,
   });
 }

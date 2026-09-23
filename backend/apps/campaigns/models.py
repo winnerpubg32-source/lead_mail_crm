@@ -1,10 +1,9 @@
 """
-Campaign models (Phase 6).
+Campaign models (Phase 6 + Phase 7).
 
 A Campaign describes an outreach sequence: audience targeting rules, an
-e-mail template, a daily send limit, and a lifecycle status. Phase 6
-validates and prepares campaigns but does NOT send real e-mails (that
-ships in Phase 7).
+e-mail template, a daily send limit, a sending window, and a lifecycle
+status. Phase 7 queues prepared memberships for the SMTP delivery engine.
 """
 
 from __future__ import annotations
@@ -14,7 +13,7 @@ from django.db import models
 
 from core.models import TimeStampedModel
 
-__all__ = ["Campaign", "CampaignStatus", "CampaignLead"]
+__all__ = ["Campaign", "CampaignLead", "CampaignStatus"]
 
 
 class CampaignStatus(models.TextChoices):
@@ -30,7 +29,11 @@ class CampaignStatus(models.TextChoices):
 STATUS_TRANSITIONS: dict[str, set[str]] = {
     CampaignStatus.DRAFT: {CampaignStatus.READY, CampaignStatus.CANCELLED},
     CampaignStatus.READY: {CampaignStatus.RUNNING, CampaignStatus.DRAFT, CampaignStatus.CANCELLED},
-    CampaignStatus.RUNNING: {CampaignStatus.PAUSED, CampaignStatus.COMPLETED, CampaignStatus.CANCELLED},
+    CampaignStatus.RUNNING: {
+        CampaignStatus.PAUSED,
+        CampaignStatus.COMPLETED,
+        CampaignStatus.CANCELLED,
+    },
     CampaignStatus.PAUSED: {CampaignStatus.RUNNING, CampaignStatus.CANCELLED},
     CampaignStatus.COMPLETED: set(),
     CampaignStatus.CANCELLED: set(),
@@ -63,9 +66,13 @@ class Campaign(TimeStampedModel):
         related_name="campaigns",
     )
 
-    # Schedule (phase 6 only stores the intended start/end; no execution yet).
+    # Calendar schedule plus the daily sending window used by the Phase 7
+    # dispatcher. A null window falls back to the workspace environment
+    # defaults (OUTREACH_SENDING_START_TIME / OUTREACH_SENDING_END_TIME).
     scheduled_start_at = models.DateTimeField(null=True, blank=True)
     scheduled_end_at = models.DateTimeField(null=True, blank=True)
+    sending_start_time = models.TimeField(null=True, blank=True)
+    sending_end_time = models.TimeField(null=True, blank=True)
 
     # Delivery cap (phase 7 enforces this against SMTP).
     daily_limit = models.PositiveIntegerField(default=90)
@@ -92,9 +99,7 @@ class Campaign(TimeStampedModel):
 
     class Meta:
         ordering = ("-created_at",)
-        indexes = [
-            models.Index(fields=["status", "-created_at"]),
-        ]
+        indexes = (models.Index(fields=["status", "-created_at"]),)
 
     def __str__(self) -> str:
         return self.name or f"Campaign #{self.pk}"
@@ -105,9 +110,7 @@ class Campaign(TimeStampedModel):
 
     def transition_to(self, new_status: str, *, actor: str = "") -> None:
         if not self.can_transition_to(new_status):
-            raise ValidationError(
-                f"Cannot transition campaign from {self.status} to {new_status}."
-            )
+            raise ValidationError(f"Cannot transition campaign from {self.status} to {new_status}.")
         self.status = new_status
 
     def audience_filters(self) -> dict:
@@ -176,7 +179,9 @@ class CampaignLead(TimeStampedModel):
         SKIPPED = "SKIPPED", "Skipped"
 
     campaign = models.ForeignKey(Campaign, on_delete=models.CASCADE, related_name="memberships")
-    lead = models.ForeignKey("leads.Lead", on_delete=models.CASCADE, related_name="campaign_memberships")
+    lead = models.ForeignKey(
+        "leads.Lead", on_delete=models.CASCADE, related_name="campaign_memberships"
+    )
     send_status = models.CharField(
         max_length=20, choices=SendStatus.choices, default=SendStatus.PENDING, db_index=True
     )
@@ -185,9 +190,7 @@ class CampaignLead(TimeStampedModel):
 
     class Meta:
         unique_together = ("campaign", "lead")
-        indexes = [
-            models.Index(fields=["campaign", "send_status"]),
-        ]
+        indexes = (models.Index(fields=["campaign", "send_status"]),)
 
     def __str__(self) -> str:
         return f"{self.campaign_id} / lead {self.lead_id} ({self.send_status})"

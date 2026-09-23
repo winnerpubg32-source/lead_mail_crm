@@ -13,7 +13,9 @@ primary database, Redis/Celery handle background imports.
 | Phase 3 — CSV/XLSX import (column detection, preview, chunked processing, history) | ✅ Completed |
 | Phase 4 — Data normalization · deduplication · merge · missing-email · data-quality dashboard | ✅ Completed |
 | Phase 5 — Lead Management (scoring, detail page, bulk actions, CSV export, activity timeline) | ✅ Completed |
-| Phase 6+ (campaigns, SMTP, AI personalization, service matching, follow-ups, CRM, analytics) | ⛔ Not implemented |
+| Phase 6 — Campaigns + email templates | ✅ Completed |
+| Phase 7 — SMTP email sending engine | ✅ Completed |
+| Phase 8+ — AI personalization, service matching, follow-ups, CRM, analytics | ⛔ Not implemented |
 
 ---
 
@@ -213,9 +215,9 @@ Navigation is extended in `config/navigation.ts` and routes added in
   scheduled nightly scan can be added in a later phase.
 * Frontend toast notifications are intentionally minimal (plain DOM nodes, no
   animation library). A shared design-system toast is a future refinement.
-* Phase 5+ features (lead scoring, campaigns, SMTP sending, AI personalization,
-  service matching, follow-ups, CRM workflows, advanced analytics) are
-  deliberately **not** implemented, as per the scope boundary.
+* Phase 8+ features (AI personalization, service matching, follow-ups, CRM
+  workflows, advanced analytics) are deliberately **not** implemented, as per
+  the current scope boundary.
 
 ---
 
@@ -365,8 +367,8 @@ for previews. Inline preview is available for editor-as-you-type.
   leads into `CampaignLead` (PENDING), sets `eligible_count`, transitions to
   READY.
 * `transition_campaign(campaign, new_status)` — enforces allowed transitions;
-  DRAFT→RUNNING auto-prepares. Phase 6 never creates `EmailMessage` rows or
-  calls SMTP.
+  DRAFT→RUNNING auto-prepares, renders the template, and queues Phase 7
+  `EmailMessage` rows. SMTP itself remains in Celery workers.
 
 ### Backend APIs
 
@@ -426,9 +428,81 @@ Supporting files:
 * `npm run build` succeeds; new chunks: CampaignsPage, CampaignDetailPage, CampaignWizard, TemplatesPage.
 * `npm test` (Vitest) — **47 tests passing**; campaigns/templates routes removed from placeholder tests and mocked to stay offline.
 
-### Non-goals (Phase 7+)
+### Non-goals (Phase 8+)
 
-* Real SMTP delivery, per-mailbox configuration, daily send-budget enforcement.
+* Per-mailbox configuration and provider-specific routing.
 * Campaign steps / sequences beyond a single template.
 * Open/click tracking, bounce/complaint webhooks, automatic STOP-ON-REPLY.
 * Variable personalization via the AI engine.
+
+---
+
+## Phase 7 Implementation
+
+Phase 7 adds the SMTP delivery engine on top of the Phase 6 campaign audience
+snapshot. Campaign preparation remains a database-only operation; transitioning
+a prepared campaign to `RUNNING` now renders and queues one outbound message per
+pending `CampaignLead` membership. Celery workers deliver those messages through
+Django's configured e-mail backend.
+
+### New delivery models
+
+* `email_engine.EmailMessage` — one idempotent outbound message per campaign +
+  lead, with rendered `to_email`, subject/body snapshot, `QUEUED`, `PROCESSING`,
+  `SENT`, `FAILED`, `CANCELLED`, and `BOUNCED` states, schedule/send timestamps,
+  error text, attempt count, and per-day reservation metadata.
+* `email_engine.DailyEmailUsage` — one row per local workspace date. Its
+  conditional database update reserves the next marketing slot atomically and
+  prevents concurrent Celery workers from reserving more than the configured
+  default of 90 slots per day.
+* `Campaign.sending_start_time` / `sending_end_time` — optional per-campaign
+  daily sending window, falling back to `OUTREACH_SENDING_START_TIME` /
+  `OUTREACH_SENDING_END_TIME` (09:00–17:00 by default).
+
+### Delivery flow
+
+`transition_campaign(..., RUNNING)` locks the campaign, validates/prepares it if
+needed, renders the Phase 6 template against the real lead context, creates
+`QUEUED` `EmailMessage` rows, and marks memberships `QUEUED`. Message timestamps
+are distributed through the sending window across days, respecting both the
+campaign limit and the global 90/day limit. No SMTP connection is made by the
+HTTP request.
+
+Celery beat runs `email_engine.dispatch_due_email_messages` every minute. Due
+messages are atomically claimed as `PROCESSING`, reserve a daily slot, and are
+sent with `django.core.mail.EmailMessage` using `EMAIL_BACKEND`, `EMAIL_HOST`,
+`EMAIL_PORT`, `EMAIL_HOST_USER`, `EMAIL_HOST_PASSWORD`, `EMAIL_USE_TLS`, and
+`DEFAULT_FROM_EMAIL`. Provider failures return the message to `QUEUED` and use
+Celery exponential retries (up to three retries); permanent failures become
+`FAILED`. A successful task is idempotent: a later redelivery sees `SENT` and
+cannot send again. The reservation stays with the message across same-day
+retries, so retries cannot consume multiple daily slots.
+
+Successful delivery updates `EmailMessage`, `CampaignLead`, `Campaign.sent_count`
+and appends a `LeadActivity.EMAIL_SENT` event. Cancelling a campaign cancels
+queued/processing messages. SMTP credentials are passed only to Django backend
+and Celery containers; no `VITE_*` variable contains them.
+
+### Phase 7 APIs and dashboard
+
+* `GET /api/v1/email/usage/` returns `sent_today`, `limit`, `remaining`,
+  `progress_pct`, queued/failed counts, and the configured window without SMTP
+  credentials.
+* `GET /api/v1/email/messages/` and `/messages/{id}/` expose read-only delivery
+  history; `/messages/statuses/` exposes the delivery enum.
+* Existing campaign launch/status and member APIs now reflect actual queued and
+  sent states. The campaign wizard collects the sending window and launches
+  through `RUNNING`, which creates the queue.
+* The dashboard capacity card can overlay live usage when the frontend is using
+  the live API; it continues to show the existing 90/day capacity visual in mock
+  mode.
+
+### Migrations and verification
+
+* `campaigns/migrations/0002_campaign_sending_window.py`
+* `email_engine/migrations/0002_emailmessage_dailyemailusage.py`
+* `319` backend tests pass against SQLite, including quota boundary tests,
+  concurrent reservation tests, queue rendering/window spacing, SMTP retry, and
+  no-duplicate redelivery behavior.
+* `manage.py check`, `makemigrations --check`, Ruff checks/format, frontend
+  typecheck, Vitest, and Vite production build pass.

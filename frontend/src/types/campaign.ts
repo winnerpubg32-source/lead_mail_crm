@@ -27,6 +27,8 @@ export interface Campaign {
   template_detail?: EmailTemplate | null;
   scheduled_start_at: string | null;
   scheduled_end_at: string | null;
+  sending_start_time: string | null;
+  sending_end_time: string | null;
   daily_limit: number;
   status: CampaignStatus;
   status_display: string;
@@ -102,6 +104,8 @@ export interface CampaignWizardDraft {
   daily_limit: number;
   scheduled_start_at: string | null;
   scheduled_end_at: string | null;
+  sending_start_time: string | null;
+  sending_end_time: string | null;
 }
 
 export interface CampaignStatusChoice {

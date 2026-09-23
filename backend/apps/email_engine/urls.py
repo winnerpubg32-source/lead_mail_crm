@@ -1,4 +1,4 @@
-"""Routes for ``/api/v1/email/`` (Phase 6: templates; Phase 7: SMTP/sending)."""
+"""Routes for ``/api/v1/email/`` (templates, queue, and daily usage)."""
 
 from __future__ import annotations
 
@@ -11,8 +11,10 @@ app_name = "email_engine"
 
 router = DefaultRouter()
 router.register("templates", views.EmailTemplateViewSet, basename="email-template")
+router.register("messages", views.EmailMessageViewSet, basename="email-message")
 
 urlpatterns = [
     path("ping", views.EmailEnginePingView.as_view(), name="ping"),
+    path("usage/", views.EmailUsageView.as_view(), name="usage"),
     *router.urls,
 ]

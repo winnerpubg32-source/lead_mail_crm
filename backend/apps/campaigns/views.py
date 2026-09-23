@@ -40,7 +40,6 @@ from apps.campaigns.services import (
     transition_campaign,
     validate_campaign_for_launch,
 )
-from apps.leads.models import Lead
 from apps.leads.serializers import LeadListSerializer
 
 
@@ -51,7 +50,7 @@ class CampaignsPingView(APIView):
     permission_classes: tuple = (AllowAny,)
 
     def get(self, request):
-        return Response({"module": "campaigns", "status": "live", "phase": 6})
+        return Response({"module": "campaigns", "status": "live", "phase": 7})
 
 
 @extend_schema_view(
@@ -148,7 +147,8 @@ class CampaignViewSet(
                 "campaign": CampaignDetailSerializer(campaign).data,
                 "message": (
                     f"Campaign validated and prepared with {count} eligible leads. "
-                    "Note: Phase 6 does not send real e-mails."
+                    "Prepare does not send real e-mails; launching the campaign will queue "
+                    "messages for SMTP delivery."
                 ),
             }
         )

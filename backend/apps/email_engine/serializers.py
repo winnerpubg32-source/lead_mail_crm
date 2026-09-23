@@ -1,10 +1,16 @@
-"""Serializers for email templates (Phase 6)."""
+"""Serializers for templates and Phase 7 outbound delivery records."""
 
 from __future__ import annotations
 
 from rest_framework import serializers
 
-from apps.email_engine.models import EmailTemplate, SAMPLE_LEAD, TEMPLATE_VARIABLES
+from apps.email_engine.models import (
+    SAMPLE_LEAD,
+    TEMPLATE_VARIABLES,
+    EmailMessage,
+    EmailMessageStatus,
+    EmailTemplate,
+)
 
 
 class EmailTemplateSerializer(serializers.ModelSerializer):
@@ -56,8 +62,42 @@ class TemplatePreviewSerializer(serializers.Serializer):
         }
 
 
+class EmailMessageSerializer(serializers.ModelSerializer):
+    campaign_name = serializers.CharField(source="campaign.name", read_only=True)
+    lead_name = serializers.CharField(source="lead.company_name", read_only=True)
+
+    class Meta:
+        model = EmailMessage
+        fields = (
+            "id",
+            "campaign",
+            "campaign_name",
+            "lead",
+            "lead_name",
+            "to_email",
+            "subject",
+            "body",
+            "status",
+            "scheduled_at",
+            "sent_at",
+            "error_message",
+            "attempt_count",
+            "created_at",
+            "updated_at",
+        )
+        read_only_fields = fields
+
+
 def template_variables() -> dict:
     return {
         "supported_variables": TEMPLATE_VARIABLES,
         "sample_lead": SAMPLE_LEAD,
+    }
+
+
+def email_status_vocabulary() -> dict:
+    return {
+        "email_message_status": [
+            {"value": value, "label": label} for value, label in EmailMessageStatus.choices
+        ]
     }
