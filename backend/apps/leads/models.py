@@ -182,3 +182,7 @@ class Lead(TimeStampedModel):
     def is_contactable(self) -> bool:
         """True when the lead has an address that is safe to send to."""
         return bool(self.normalized_email) and self.email_status not in BLOCKED_EMAIL_STATUSES
+
+
+# Re-export activity + note models from a single import location.
+from apps.leads.activity_models import LeadActivity, LeadNote  # noqa: E402,F401

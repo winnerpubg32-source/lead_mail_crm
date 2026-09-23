@@ -27,8 +27,8 @@ export class ApiError extends Error {
 
 type RequestOptions = Omit<RequestInit, 'body'> & {
   body?: unknown;
-  /** Query string parameters; undefined/null values are dropped. */
-  query?: Record<string, string | number | boolean | undefined | null>;
+  /** Query string parameters; undefined/null values are dropped. Arrays are serialized as repeated keys. */
+  query?: Record<string, string | number | boolean | string[] | undefined | null>;
   /** Absolute URL override (used for the API root discovery endpoints). */
   absoluteUrl?: string;
 };
@@ -44,7 +44,14 @@ function buildUrl(path: string, query?: RequestOptions['query']): string {
   const url = new URL(`${base.replace(/\/$/, '')}/${path.replace(/^\//, '')}`, window.location.origin);
   if (query) {
     for (const [key, value] of Object.entries(query)) {
-      if (value !== undefined && value !== null && value !== '') {
+      if (value === undefined || value === null || value === '') continue;
+      if (Array.isArray(value)) {
+        for (const item of value) {
+          if (item !== undefined && item !== null && item !== '') {
+            url.searchParams.append(key, String(item));
+          }
+        }
+      } else {
         url.searchParams.set(key, String(value));
       }
     }

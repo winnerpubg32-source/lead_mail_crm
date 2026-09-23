@@ -22,6 +22,7 @@ class LeadApiTests(TestCase):
             industry="Transportation & Logistics",
             city="Columbus",
             state="OH",
+            website="https://northwindlogistics.com",
             source="dataset_import",
         )
         cls.brightline = Company.objects.create(

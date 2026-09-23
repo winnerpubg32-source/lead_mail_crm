@@ -8,3 +8,7 @@ class LeadsConfig(AppConfig):
     name = "apps.leads"
     label = "leads"
     verbose_name = "Leads"
+
+    def ready(self):
+        # Register post_save signal that scores newly-created leads.
+        from . import signals  # noqa: F401

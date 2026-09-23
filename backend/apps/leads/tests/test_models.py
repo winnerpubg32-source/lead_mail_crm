@@ -55,7 +55,11 @@ class LeadModelTests(TestCase):
 
     def test_defaults(self) -> None:
         lead = Lead.objects.create(company=self.company, contact=self.contact)
-        self.assertEqual(lead.lead_score, 0)
+        # Phase 5 auto-scoring assigns a score from company+contact signals.
+        # Unknown e-mail means no +20 "valid email" points; the remaining
+        # signals (contact name + phone + industry + location) sum to 40.
+        lead.refresh_from_db()
+        self.assertEqual(lead.lead_score, 40)
         self.assertEqual(lead.lead_status, LeadStatus.NEW)
         self.assertEqual(lead.email_status, EmailStatus.UNKNOWN)
         self.assertEqual(lead.source_file, "")

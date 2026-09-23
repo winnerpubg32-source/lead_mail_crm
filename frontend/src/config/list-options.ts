@@ -72,9 +72,13 @@ export function sourceLabel(value: string): string {
   return sourceOptions.find((option) => option.value === value)?.label ?? value.replace(/_/g, ' ');
 }
 
-/** Priority tiers used as quick score filters on the leads page. */
+/** Priority tiers used as quick score filters on the leads page (Phase 5). */
 export const scoreFilterOptions = [
-  { value: '80', label: 'Score ≥ 80' },
-  { value: '60', label: 'Score ≥ 60' },
-  { value: '40', label: 'Score ≥ 40' },
+  { value: 'HOT', label: 'Hot (≥ 70)' },
+  { value: 'WARM', label: 'Warm (50–69)' },
+  { value: 'COLD', label: 'Cold (20–49)' },
+  { value: 'UNQUALIFIED', label: 'Unqualified (< 20)' },
 ];
+
+/** Fallback city list — the backend supplies live distinct values when available. */
+export const cityOptions = [{ value: '', label: 'All cities' }];

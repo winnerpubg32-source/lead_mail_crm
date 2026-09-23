@@ -67,3 +67,8 @@ export function toast({ title, description, tone = 'info', duration = 3500 }: To
 
   return { dismiss };
 }
+
+toast.success = (message: string, description?: string) => toast({ title: message, description, tone: 'success' });
+toast.error = (message: string, description?: string) => toast({ title: message, description, tone: 'error' });
+toast.info = (message: string, description?: string) => toast({ title: message, description, tone: 'info' });
+

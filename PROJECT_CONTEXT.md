@@ -12,7 +12,8 @@ primary database, Redis/Celery handle background imports.
 | Phase 2 — Lead / Company / Contact database + APIs | ✅ Completed |
 | Phase 3 — CSV/XLSX import (column detection, preview, chunked processing, history) | ✅ Completed |
 | Phase 4 — Data normalization · deduplication · merge · missing-email · data-quality dashboard | ✅ Completed |
-| Phase 5+ (lead scoring, campaigns, SMTP, AI personalization, service matching, follow-ups, CRM, analytics) | ⛔ Not implemented |
+| Phase 5 — Lead Management (scoring, detail page, bulk actions, CSV export, activity timeline) | ✅ Completed |
+| Phase 6+ (campaigns, SMTP, AI personalization, service matching, follow-ups, CRM, analytics) | ⛔ Not implemented |
 
 ---
 
@@ -215,3 +216,106 @@ Navigation is extended in `config/navigation.ts` and routes added in
 * Phase 5+ features (lead scoring, campaigns, SMTP sending, AI personalization,
   service matching, follow-ups, CRM workflows, advanced analytics) are
   deliberately **not** implemented, as per the scope boundary.
+
+---
+
+## Phase 5 Implementation
+
+Phase 5 introduces professional lead-management tooling on top of Phases 1–4:
+a richer lead table with all required columns + bulk selection, configurable
+point-based lead scoring with HOT/WARM/COLD/UNQUALIFIED tiers, per-lead detail
+pages showing contact info + score breakdown + notes + activity timeline,
+bulk actions (status/industry change, campaign assignment placeholder,
+suppression, CSV export), and an append-only activity log on every lead.
+
+### New / updated modules
+
+| Module | Purpose |
+| --- | --- |
+| `apps/leads/scoring.py` | `POINTS` config, `ScoreComponents` dataclass, `ScoreClassification` enum (HOT/WARM/COLD/UNQUALIFIED), `compute_lead_score`, `score_leads_qs`, `rescore_leads`. Clamps scores to [0,100]; blocked e-mail statuses (INVALID/BOUNCED/UNSUBSCRIBED/SUPPRESSED) force score = 0 → UNQUALIFIED. |
+| `apps/leads/activity_models.py` | `ActivityType` enum (CREATED/STATUS_CHANGE/SCORE_CHANGE/NOTE_ADDED/EMAIL_SENT/EMAIL_OPENED/REPLY/MEETING/MERGED/SUPPRESSED/BULK_EDIT/CAMPAIGN_ADDED/EXPORTED/MANUAL_EDIT/VALIDATION), `LeadActivity` (append-only event log with `metadata` JSONField) and `LeadNote` (free-text notes). |
+| `apps/leads/signals.py` + `apps.py` | Post-save hook that auto-computes an initial score for newly created leads and logs a `CREATED` activity. Explicitly-set scores are not overwritten (seed data / tests keep their values). |
+| `apps/leads/services.py` | `annotate_lead_list` (adds `last_contact_at`/`note_count`/`activity_count` annotations to list querysets so the table stays O(1) queries), `record_activity`, `record_bulk_action`, `apply_bulk_action` (transactional bulk status/industry/campaign/suppress/export with activity logging), `export_leads_csv` (respects the current filters). |
+| `apps/leads/filters.py` | Adds `sub_industry`, `has_website`, `score_classification` (HOT/WARM/COLD/UNQUALIFIED, correctly handling blocked-e-mail leads) and preserves existing filters. |
+| `apps/leads/serializers.py` | `LeadDetailSerializer` includes `notes`, `activities` and `score_breakdown`; list serializer exposes new columns (website, sub_industry, street_address, zip_code, country, last_contact, score_classification, crm_status). Bulk-action and note serializers added. |
+| `apps/leads/views.py` | New routes: notes, timeline, rescore, rescore-all, bulk-action, export, filters, statuses (with score classification counts). `perform_update` logs STATUS_CHANGE / SCORE_CHANGE activities and re-scores after edits. |
+
+### Migrations
+
+* `leads/migrations/0003_leadactivity_leadnote.py` — adds `LeadActivity` and `LeadNote` tables.
+
+### Scoring rules (locked in code)
+
+| Signal | Points |
+| --- | --- |
+| Valid e-mail | +20 |
+| Has website | +15 |
+| Named contact | +10 |
+| Phone present | +10 |
+| Industry known | +10 |
+| Location (city + state) | +10 |
+| Website accessible (proxy: website field populated) | +15 |
+| Invalid e-mail | −30 |
+| Suppressed / Unsubscribed / Bounced | −100 (hard block → 0 & UNQUALIFIED) |
+
+Classification thresholds: HOT ≥ 70, WARM 50–69, COLD 20–49, UNQUALIFIED < 20 (or any blocked e-mail status). **No automatic e-mail sending** is triggered by score.
+
+### Backend APIs
+
+| Method | Endpoint | Description |
+| --- | --- | --- |
+| `GET` | `/api/v1/leads/` | Paginated list with new columns (sub_industry, website, score_classification, last_contact, source) + additional filters (sub_industry, has_website, score_classification). |
+| `GET` | `/api/v1/leads/{id}/` | Detail payload: full company/contact info, notes, activities, score breakdown. |
+| `PATCH` | `/api/v1/leads/{id}/` | Update lead_status / email_status / lead_score / source. Logs activity and re-scores. |
+| `POST` | `/api/v1/leads/{id}/notes/` | Add a note; appends a `NOTE_ADDED` activity. |
+| `GET` | `/api/v1/leads/{id}/timeline/` | Activity timeline (latest 200). |
+| `POST` | `/api/v1/leads/{id}/rescore/` | Recompute score and log a `SCORE_CHANGE` activity. |
+| `POST` | `/api/v1/leads/bulk-action/` | Bulk `change_status`, `change_industry`, `assign_campaign` (placeholder), `suppress`, `export`. All actions log `BULK_EDIT`/`STATUS_CHANGE`/`SUPPRESSED`/etc. activities per lead. |
+| `GET` | `/api/v1/leads/export/` | CSV download respecting the active filters. |
+| `GET` | `/api/v1/leads/filters/` | Distinct industry/sub_industry/city/state/source values for dynamic filter dropdowns. |
+| `GET` | `/api/v1/leads/statuses/` | Enum vocabulary extended with score classification counts and point config. |
+
+### Frontend pages / components
+
+| Route | Page | Description |
+| --- | --- | --- |
+| `/leads` | `LeadsPage` (expanded) | All 13 columns from the brief (Business, Contact, Email, Phone, Industry, Sub-industry, City, State, Lead Score, Email Status, CRM Status, Source, Last Contact). Checkbox column for bulk row selection; bulk action bar with status/industry/campaign/suppress/export; CSV export button; expanded filters (sub_industry, has_email, has_website, score_classification, source). |
+| `/leads/:id` | `LeadDetailPage` (new) | Header/contact card with company/contact/email/phone/website/address, side rail with score breakdown (colored by classification), record details card, activity timeline, notes editor, and a "Campaign history" placeholder card. "Recompute score" action triggers a rescore + refresh. |
+
+Supporting pieces:
+
+* `features/leads/components/LeadTable.tsx` — rewritten with new columns, checkbox selection, colored score chips (HOT/WARM/COLD/UNQUALIFIED), Last Contact relative timestamps, links to detail page.
+* `features/leads/components/BulkActionBar.tsx` — sticky toolbar shown when rows are selected.
+* `features/leads/components/ContactCard.tsx`, `ScoreBreakdown.tsx`, `ActivityTimeline.tsx`, `NotesPanel.tsx` — detail page cards.
+* `components/ui/Textarea.tsx` — small shared textarea used by notes.
+* `hooks/useLeads.ts` — extended with `useLead`, `useLeadFilterOptions`, `useUpdateLead`, `useAddLeadNote`, `useRescoreLead`, `useBulkAction`, `useExportLeads`.
+* `services/leads.service.ts` — typed helpers for all new endpoints plus a CSV export helper that downloads the blob with the server-provided filename.
+* `config/status.ts` — `scoreClassification`, `scoreClassificationConfig`, `ACTIVITY_ICONS`; score colors/tone aligned to HOT/WARM/COLD/UNQUALIFIED; MERGED added to lead status config.
+* `config/list-options.ts` — score filters use classification labels (HOT/WARM/COLD/UNQUALIFIED) instead of raw numeric cutoffs.
+* `lib/api/client.ts` — query parameter serializer supports repeated keys (array values → multiple `?key=v1&key=v2`) for future multi-select filters.
+* `lib/utils/toast.ts` — `toast.success/error/info` convenience shortcuts.
+
+### Performance considerations
+
+* List querysets are annotated once via `annotate_lead_list` using a single `Subquery`, avoiding N+1 activity queries per row.
+* Score counts on the statuses endpoint iterate leads in chunks (`iterator(chunk_size=500)`).
+* Bulk actions run inside a single `transaction.atomic()` and re-score only the affected IDs.
+* CSV export streams rows via Django's `iterator(chunk_size=500)` so the whole table isn't pulled into memory at once.
+* Lead row links use react-router `<Link>` for instant transitions; selections live in page state, clearing on navigation.
+
+### Tests performed
+
+* `python manage.py check` — passes with 0 issues.
+* New migration `0003_leadactivity_leadnote` applies cleanly.
+* **297 backend tests passing** (up from 286). New tests cover:
+  * scoring rules, classification thresholds, blocked-email zeroing;
+  * locked point-value config contract;
+  * detail payload includes notes, activities, score breakdown, new fields;
+  * add-note endpoint logs NOTE_ADDED activity;
+  * rescore endpoint recomputes score and persists it;
+  * bulk status change and bulk suppress set status/email/score correctly and log activities;
+  * CSV export returns valid CSV with the lead row;
+  * HOT/WARM/COLD/UNQUALIFIED filters return correct counts (blocked e-mails always fall into UNQUALIFIED).
+* `tsc --noEmit` — clean.
+* `npm run build` — production build succeeds (LeadDetailPage chunk: 13 kB gzipped 4 kB).
+* `npm test` (Vitest) — **49 tests** all passing, including the updated LeadsPage test covering all new columns.

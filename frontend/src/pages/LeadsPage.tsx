@@ -1,3 +1,4 @@
+import { useCallback, useMemo, useState } from 'react';
 import { Download, RefreshCw, Target, Users } from 'lucide-react';
 
 import { EmptyState } from '@/components/feedback/EmptyState';
@@ -9,20 +10,28 @@ import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { Pagination } from '@/components/ui/Pagination';
 import { TableToolbar } from '@/components/ui/TableToolbar';
-import { emailStatusOptions, industryOptions, leadStatusOptions, stateOptions } from '@/config/list-options';
+import {
+  emailStatusOptions,
+  industryOptions,
+  leadStatusOptions,
+  sourceOptions,
+  stateOptions,
+  scoreFilterOptions,
+} from '@/config/list-options';
+import { BulkActionBar } from '@/features/leads/components/BulkActionBar';
 import { LeadTable } from '@/features/leads/components/LeadTable';
 import { useDocumentTitle } from '@/hooks/useDocumentTitle';
-import { useLeadStatuses, useLeads } from '@/hooks/useLeads';
+import { useExportLeads, useLeadFilterOptions, useLeads, useLeadStatuses } from '@/hooks/useLeads';
 import { useListQuery } from '@/hooks/useListQuery';
 import { env } from '@/lib/env';
 import { formatNumber } from '@/lib/utils/format';
+import { toast } from '@/lib/utils/toast';
 
 /**
- * Leads — the real list backed by `GET /api/v1/leads/`.
+ * Leads (Phase 5).
  *
- * Search, filters, ordering and pagination are all server-side: every control
- * maps to a DRF query parameter, so the table stays correct as the dataset grows
- * past what the browser should hold.
+ * Full lead table with search, multi-column filters, sortable headers,
+ * pagination, bulk selection + actions, and CSV export.
  */
 export function LeadsPage() {
   useDocumentTitle('Leads');
@@ -30,20 +39,79 @@ export function LeadsPage() {
   const list = useListQuery();
   const { data, isPending, isError, error, refetch, isFetching } = useLeads(list.params);
   const statuses = useLeadStatuses();
+  const filters = useLeadFilterOptions();
+  const exporter = useExportLeads();
+
+  const [selected, setSelected] = useState<Set<number>>(new Set());
 
   const leads = data?.results ?? [];
   const count = data?.count ?? 0;
   const hasRows = leads.length > 0;
 
-  // Prefer the live vocabulary (labels + counts) and fall back to the static
-  // enum list while it loads or when the endpoint returns nothing.
-  const statusFilterOptions =
-    statuses.data && statuses.data.lead_status.length > 0
-      ? statuses.data.lead_status.map((entry) => ({
+  const statusFilterOptions = useMemo(() => {
+    if (statuses.data && statuses.data.lead_status.length > 0) {
+      return statuses.data.lead_status
+        .filter((entry) => entry.value !== 'MERGED')
+        .map((entry) => ({
           value: entry.value,
           label: entry.count > 0 ? `${entry.label} (${entry.count})` : entry.label,
-        }))
-      : leadStatusOptions;
+        }));
+    }
+    return leadStatusOptions;
+  }, [statuses.data]);
+
+  const emailStatusFilterOptions = useMemo(() => {
+    if (statuses.data && statuses.data.email_status.length > 0) {
+      return statuses.data.email_status.map((entry) => ({
+        value: entry.value,
+        label: entry.count > 0 ? `${entry.label} (${entry.count})` : entry.label,
+      }));
+    }
+    return emailStatusOptions;
+  }, [statuses.data]);
+
+  const industryFilterOptions = useMemo(
+    () =>
+      filters.data?.industries.length
+        ? filters.data.industries.map((v: string) => ({ value: v, label: v }))
+        : industryOptions,
+    [filters.data],
+  );
+  const stateFilterOptions = useMemo(
+    () =>
+      filters.data?.states.length
+        ? filters.data.states.map((v: string) => ({ value: v, label: v }))
+        : stateOptions,
+    [filters.data],
+  );
+
+  // Row selection helpers.
+  const toggleOne = useCallback((id: number, isOn: boolean) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (isOn) next.add(id);
+      else next.delete(id);
+      return next;
+    });
+  }, []);
+  const toggleAll = useCallback(
+    (isOn: boolean) => {
+      if (isOn) setSelected(new Set(leads.map((l) => l.id)));
+      else setSelected(new Set());
+    },
+    [leads],
+  );
+  const clearSelection = useCallback(() => setSelected(new Set()), []);
+
+  const allSelected = leads.length > 0 && leads.every((l) => selected.has(l.id));
+  const someSelected = selected.size > 0 && !allSelected;
+
+  const handleExport = () => {
+    exporter.mutate(list.params, {
+      onSuccess: () => toast.success('Export started'),
+      onError: (err: Error) => toast.error(err.message || 'Export failed'),
+    });
+  };
 
   return (
     <div>
@@ -68,8 +136,8 @@ export function LeadsPage() {
             <Button
               variant="outline"
               size="sm"
-              disabled
-              title="CSV/XLSX import ships in a later phase"
+              onClick={handleExport}
+              isLoading={exporter.isPending}
               leadingIcon={<Download className="size-3.5" />}
             >
               Export
@@ -82,7 +150,7 @@ export function LeadsPage() {
         <TableToolbar
           search={list.search}
           onSearchChange={list.setSearch}
-          searchPlaceholder="Search business, contact, e-mail or title…"
+          searchPlaceholder="Search business, contact, e-mail, source or title…"
           filters={[
             {
               name: 'lead_status',
@@ -94,19 +162,56 @@ export function LeadsPage() {
               name: 'email_status',
               label: 'All e-mail status',
               value: list.filters.email_status ?? '',
-              options: emailStatusOptions,
+              options: emailStatusFilterOptions,
+            },
+            {
+              name: 'score_classification',
+              label: 'All scores',
+              value: list.filters.score_classification ?? '',
+              options: scoreFilterOptions,
             },
             {
               name: 'industry',
               label: 'All industries',
               value: list.filters.industry ?? '',
-              options: industryOptions,
+              options: industryFilterOptions,
+            },
+            {
+              name: 'sub_industry',
+              label: 'All sub-industries',
+              value: list.filters.sub_industry ?? '',
+              options:
+                filters.data?.sub_industries.map((v: string) => ({ value: v, label: v })) ?? [],
             },
             {
               name: 'state',
               label: 'All states',
               value: list.filters.state ?? '',
-              options: stateOptions,
+              options: stateFilterOptions,
+            },
+            {
+              name: 'source',
+              label: 'All sources',
+              value: list.filters.source ?? '',
+              options: sourceOptions,
+            },
+            {
+              name: 'has_email',
+              label: 'Any e-mail',
+              value: list.filters.has_email ?? '',
+              options: [
+                { value: 'true', label: 'Has e-mail' },
+                { value: 'false', label: 'Missing e-mail' },
+              ],
+            },
+            {
+              name: 'has_website',
+              label: 'Any website',
+              value: list.filters.has_website ?? '',
+              options: [
+                { value: 'true', label: 'Has website' },
+                { value: 'false', label: 'No website' },
+              ],
             },
           ]}
           onFilterChange={list.setFilter}
@@ -126,7 +231,7 @@ export function LeadsPage() {
         />
 
         {isPending ? (
-          <TableSkeleton rows={8} columns={9} />
+          <TableSkeleton rows={8} columns={13} />
         ) : isError ? (
           <div className="p-5">
             <ErrorState
@@ -153,7 +258,7 @@ export function LeadsPage() {
               <EmptyState
                 icon={<Target />}
                 title="No leads yet"
-                description="The lead database is empty. Importing business datasets arrives in the next phase — for now you can seed development data with `python manage.py seed_lead_data`."
+                description="The lead database is empty. Import a CSV to get started."
                 action={
                   <Button
                     variant="primary"
@@ -175,7 +280,19 @@ export function LeadsPage() {
           </div>
         ) : (
           <>
-            <LeadTable leads={leads} ordering={list.ordering} onToggleOrdering={list.toggleOrdering} />
+            <LeadTable
+              leads={leads}
+              ordering={list.ordering}
+              onToggleOrdering={list.toggleOrdering}
+              selected={selected}
+              onToggleOne={toggleOne}
+              onToggleAll={toggleAll}
+              allSelected={allSelected}
+              someSelected={someSelected}
+            />
+            {selected.size > 0 && (
+              <BulkActionBar selected={selected} onClear={clearSelection} params={list.params} />
+            )}
             <Pagination
               count={count}
               page={list.page}

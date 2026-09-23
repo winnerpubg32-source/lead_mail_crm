@@ -2,6 +2,7 @@
 export const paths = {
   dashboard: '/dashboard',
   leads: '/leads',
+  leadDetail: '/leads/:id',
   companies: '/companies',
   contacts: '/contacts',
   imports: '/imports',

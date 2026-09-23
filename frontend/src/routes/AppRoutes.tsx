@@ -28,6 +28,9 @@ const SettingsPage = lazy(() =>
 const LeadsPage = lazy(() =>
   import('@/pages/LeadsPage').then((module) => ({ default: module.LeadsPage })),
 );
+const LeadDetailPage = lazy(() =>
+  import('@/pages/LeadDetailPage').then((module) => ({ default: module.LeadDetailPage })),
+);
 const CompaniesPage = lazy(() =>
   import('@/pages/CompaniesPage').then((module) => ({ default: module.CompaniesPage })),
 );
@@ -70,12 +73,20 @@ export function AppRoutes() {
           }
         />
 
-        {/* Lead database — implemented (Phase 2) */}
+        {/* Lead database — implemented (Phase 2, expanded in Phase 5) */}
         <Route
           path={paths.leads}
           element={
             <Suspense fallback={<TablePageSkeleton />}>
               <LeadsPage />
+            </Suspense>
+          }
+        />
+        <Route
+          path={paths.leadDetail}
+          element={
+            <Suspense fallback={<TablePageSkeleton />}>
+              <LeadDetailPage />
             </Suspense>
           }
         />
