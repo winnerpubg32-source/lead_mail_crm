@@ -4,20 +4,32 @@ import { Navigate, Route, Routes } from 'react-router-dom';
 import { AppShell } from '@/components/layout/AppShell';
 import { DashboardSkeleton } from '@/features/dashboard/components/DashboardSkeleton';
 import { LoadingState } from '@/components/feedback/LoadingState';
+import { TablePageSkeleton } from '@/features/leads/components/TablePageSkeleton';
 import { paths } from '@/routes/paths';
 
 /**
  * Route table with code-split pages.
  *
- * `/dashboard` is the only fully functional page in Phase 1; every other module
- * renders the shared placeholder driven by `config/modules.ts`. Each page is
- * lazily imported so the initial bundle only carries the shell + dashboard.
+ * Phase 2: `/leads`, `/companies` and `/contacts` are real, API-backed tables.
+ * `/dashboard` is backed by the analytics endpoint (placeholder dataset until
+ * that endpoint exists), and the remaining modules render the shared placeholder
+ * driven by `config/modules.ts`. Every page is lazily imported so the initial
+ * bundle only carries the shell + dashboard.
  */
 const DashboardPage = lazy(() =>
   import('@/pages/DashboardPage').then((module) => ({ default: module.DashboardPage })),
 );
 const SettingsPage = lazy(() =>
   import('@/pages/SettingsPage').then((module) => ({ default: module.SettingsPage })),
+);
+const LeadsPage = lazy(() =>
+  import('@/pages/LeadsPage').then((module) => ({ default: module.LeadsPage })),
+);
+const CompaniesPage = lazy(() =>
+  import('@/pages/CompaniesPage').then((module) => ({ default: module.CompaniesPage })),
+);
+const ContactsPage = lazy(() =>
+  import('@/pages/ContactsPage').then((module) => ({ default: module.ContactsPage })),
 );
 const ModulePage = lazy(() =>
   import('@/pages/ModulePlaceholderPage').then((module) => ({ default: module.ModulePage })),
@@ -40,12 +52,35 @@ export function AppRoutes() {
           }
         />
 
-        {/* Phase 2 modules — each renders the shared placeholder */}
+        {/* Lead database — implemented (Phase 2) */}
+        <Route
+          path={paths.leads}
+          element={
+            <Suspense fallback={<TablePageSkeleton />}>
+              <LeadsPage />
+            </Suspense>
+          }
+        />
+        <Route
+          path={paths.companies}
+          element={
+            <Suspense fallback={<TablePageSkeleton />}>
+              <CompaniesPage />
+            </Suspense>
+          }
+        />
+        <Route
+          path={paths.contacts}
+          element={
+            <Suspense fallback={<TablePageSkeleton />}>
+              <ContactsPage />
+            </Suspense>
+          }
+        />
+
+        {/* Later-phase modules — each renders the shared placeholder */}
         {(
           [
-            [paths.leads, 'leads'],
-            [paths.companies, 'companies'],
-            [paths.contacts, 'contacts'],
             [paths.imports, 'imports'],
             [paths.campaigns, 'campaigns'],
             [paths.email, 'email'],

@@ -1,0 +1,230 @@
+import { screen, waitFor, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+import { LeadsPage } from '@/pages/LeadsPage';
+import { renderWithProviders } from '@/test/renderWithProviders';
+import type { Lead } from '@/types/lead';
+
+const fetchLeads = vi.hoisted(() => vi.fn());
+const fetchLeadStatuses = vi.hoisted(() => vi.fn());
+
+vi.mock('@/services/leads.service', async () => {
+  const actual = await vi.importActual<typeof import('@/services/leads.service')>(
+    '@/services/leads.service',
+  );
+  return { ...actual, fetchLeads, fetchLeadStatuses };
+});
+
+function lead(overrides: Partial<Lead> = {}): Lead {
+  return {
+    id: 1,
+    company: 1,
+    company_name: 'Northwind Logistics, Inc.',
+    contact: 1,
+    contact_name: 'Marcus Whitfield',
+    job_title: 'VP Operations',
+    email: 'm.whitfield@northwindlogistics.com',
+    phone: '(614) 555-0142',
+    industry: 'Transportation & Logistics',
+    city: 'Columbus',
+    state: 'OH',
+    lead_score: 92,
+    lead_status: 'QUALIFIED',
+    lead_status_display: 'Qualified',
+    email_status: 'VALID',
+    email_status_display: 'Valid',
+    source: 'dataset_import',
+    source_file: 'us_businesses_q3_2026.csv',
+    source_row_number: 4287,
+    is_contactable: true,
+    created_at: '2026-09-23T10:00:00Z',
+    updated_at: '2026-09-23T10:00:00Z',
+    ...overrides,
+  };
+}
+
+function page(results: Lead[], overrides: Partial<{ count: number; next: string | null; previous: string | null }> = {}) {
+  return { count: results.length, next: null, previous: null, results, ...overrides };
+}
+
+describe('LeadsPage', () => {
+  beforeEach(() => {
+    fetchLeads.mockReset();
+    fetchLeadStatuses.mockReset();
+    fetchLeadStatuses.mockResolvedValue({
+      lead_status: [],
+      email_status: [],
+      total: 0,
+      defaults: { lead_status: 'NEW', email_status: 'UNKNOWN' },
+    });
+  });
+
+  it('renders the lead table with every required column', async () => {
+    fetchLeads.mockResolvedValue(page([lead()]));
+    renderWithProviders(<LeadsPage />, { route: '/leads' });
+
+    // Column headers from the brief, in order.
+    const headers = await screen.findAllByRole('columnheader');
+    const headerLabels = headers.map((header) => header.textContent?.trim() ?? '');
+    expect(headerLabels).toEqual([
+      'Business',
+      'Contact',
+      'Email',
+      'Phone',
+      'Industry',
+      'City',
+      'State',
+      'Lead Score',
+      'Status',
+    ]);
+
+    // Row data, including business / contact / e-mail / phone / location / score / status.
+    const table = screen.getByRole('table');
+    for (const cell of [
+      'Northwind Logistics, Inc.',
+      'Marcus Whitfield',
+      'VP Operations',
+      'm.whitfield@northwindlogistics.com',
+      'Valid',
+      '(614) 555-0142',
+      'Transportation & Logistics',
+      'Columbus',
+      'OH',
+      '92',
+      'Qualified',
+    ]) {
+      expect(within(table).getByText(cell)).toBeInTheDocument();
+    }
+  });
+
+  it('shows a loading skeleton before data arrives', async () => {
+    fetchLeads.mockReturnValue(new Promise(() => undefined));
+    renderWithProviders(<LeadsPage />, { route: '/leads' });
+
+    expect(await screen.findByRole('heading', { level: 1, name: 'Leads' })).toBeInTheDocument();
+    expect(document.querySelectorAll('[aria-busy="true"]').length).toBeGreaterThan(0);
+  });
+
+  it('shows the empty state when the database has no leads', async () => {
+    fetchLeads.mockResolvedValue(page([]));
+    renderWithProviders(<LeadsPage />, { route: '/leads' });
+
+    expect(await screen.findByText('No leads yet')).toBeInTheDocument();
+    expect(screen.getByText(/seed_lead_data/)).toBeInTheDocument();
+  });
+
+  it('shows a filter-specific empty state when a query matches nothing', async () => {
+    fetchLeads.mockResolvedValue(page([]));
+    renderWithProviders(<LeadsPage />, { route: '/leads' });
+
+    await userEvent.type(screen.getByLabelText(/search business/i), 'zzz');
+
+    expect(await screen.findByText('No leads match these filters')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: /clear filters/i }));
+    await waitFor(() => expect(fetchLeads).toHaveBeenCalled());
+  });
+
+  it('sends the search term to the API after debouncing', async () => {
+    fetchLeads.mockResolvedValue(page([lead()]));
+    renderWithProviders(<LeadsPage />, { route: '/leads' });
+    await screen.findByText('Northwind Logistics, Inc.');
+
+    await userEvent.type(screen.getByLabelText(/search business/i), 'vertex');
+
+    await waitFor(
+      () => {
+        const calls = fetchLeads.mock.calls.map(([params]) => params.search);
+        expect(calls).toContain('vertex');
+      },
+      { timeout: 2000 },
+    );
+    // Page resets to 1 whenever the search changes.
+    const lastCall = fetchLeads.mock.calls.at(-1)?.[0];
+    expect(lastCall.page).toBe(1);
+  });
+
+  it('sends status and e-mail filters to the API', async () => {
+    fetchLeads.mockResolvedValue(page([lead()]));
+    renderWithProviders(<LeadsPage />, { route: '/leads' });
+    await screen.findByText('Northwind Logistics, Inc.');
+
+    await userEvent.selectOptions(screen.getByLabelText('All statuses'), 'REPLIED');
+
+    await waitFor(() => {
+      const lastCall = fetchLeads.mock.calls.at(-1)?.[0];
+      expect(lastCall.lead_status).toBe('REPLIED');
+      expect(lastCall.page).toBe(1);
+    });
+
+    await userEvent.selectOptions(screen.getByLabelText('All e-mail status'), 'BOUNCED');
+    await waitFor(() => {
+      const lastCall = fetchLeads.mock.calls.at(-1)?.[0];
+      expect(lastCall.email_status).toBe('BOUNCED');
+    });
+  });
+
+  it('toggles ordering when a sortable header is clicked', async () => {
+    fetchLeads.mockResolvedValue(page([lead()]));
+    renderWithProviders(<LeadsPage />, { route: '/leads' });
+    await screen.findByText('Northwind Logistics, Inc.');
+
+    await userEvent.click(screen.getByRole('button', { name: 'Sort by Lead Score' }));
+
+    await waitFor(() => {
+      expect(fetchLeads.mock.calls.at(-1)?.[0].ordering).toBe('lead_score');
+    });
+  });
+
+  it('paginates using the DRF next/previous links', async () => {
+    fetchLeads.mockResolvedValue(
+      page([lead()], { count: 60, next: 'http://api/leads/?page=2', previous: null }),
+    );
+    renderWithProviders(<LeadsPage />, { route: '/leads' });
+    await screen.findByText('Northwind Logistics, Inc.');
+
+    // First page of a 60-row result set with the default page size of 25.
+    expect(screen.getByTestId('pagination-summary')).toHaveTextContent('Showing 1–25 of 60 leads');
+
+    fetchLeads.mockResolvedValue(
+      page([lead({ id: 2, company_name: 'Vertex Precision Manufacturing' })], {
+        count: 60,
+        next: 'http://api/leads/?page=3',
+        previous: 'http://api/leads/?page=1',
+      }),
+    );
+    await userEvent.click(screen.getByRole('button', { name: /next page/i }));
+
+    await waitFor(() => expect(fetchLeads.mock.calls.at(-1)?.[0].page).toBe(2));
+    expect(await screen.findByText('Vertex Precision Manufacturing')).toBeInTheDocument();
+  });
+
+  it('shows an error state with retry when the API fails', async () => {
+    fetchLeads.mockRejectedValueOnce(new Error('Network unreachable'));
+    fetchLeads.mockResolvedValue(page([lead()]));
+
+    renderWithProviders(<LeadsPage />, { route: '/leads' });
+
+    expect(await screen.findByText('Could not load leads')).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: /try again/i }));
+    expect(await screen.findByText('Northwind Logistics, Inc.')).toBeInTheDocument();
+  });
+
+  it('renders lead status counts from the vocabulary endpoint in the filter', async () => {
+    fetchLeads.mockResolvedValue(page([lead()]));
+    fetchLeadStatuses.mockResolvedValue({
+      lead_status: [{ value: 'QUALIFIED', label: 'Qualified', count: 12 }],
+      email_status: [],
+      total: 12,
+      defaults: { lead_status: 'NEW', email_status: 'UNKNOWN' },
+    });
+
+    renderWithProviders(<LeadsPage />, { route: '/leads' });
+
+    const select = await screen.findByLabelText('All statuses');
+    await waitFor(() => {
+      expect(within(select).getByText('Qualified (12)')).toBeInTheDocument();
+    });
+  });
+});

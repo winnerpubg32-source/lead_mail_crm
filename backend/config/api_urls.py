@@ -29,4 +29,17 @@ urlpatterns = [
     path("v1/crm/", include("apps.crm.urls")),
     path("v1/analytics/", include("apps.analytics.urls")),
     path("v1/suppression/", include("apps.suppression.urls")),
+    # --- Unversioned aliases for the collections that are live --------------
+    # The product brief addresses these as ``/api/leads/``, ``/api/companies/``
+    # and ``/api/contacts/``. Both spellings resolve to the same read-only
+    # viewsets; ``/api/v1/...`` stays the canonical route used by the frontend.
+    # Separate namespaces keep ``reverse()`` unambiguous (see urls.W005).
+    path(
+        "companies/",
+        include(("apps.companies.urls", "companies_legacy"), namespace="companies_legacy"),
+    ),
+    path(
+        "contacts/", include(("apps.contacts.urls", "contacts_legacy"), namespace="contacts_legacy")
+    ),
+    path("leads/", include(("apps.leads.urls", "leads_legacy"), namespace="leads_legacy")),
 ]

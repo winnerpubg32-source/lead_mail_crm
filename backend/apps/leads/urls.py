@@ -2,13 +2,13 @@
 
 from __future__ import annotations
 
-from django.urls import path
+from rest_framework.routers import DefaultRouter
 
 from apps.leads import views
 
 app_name = "leads"
 
-urlpatterns = [
-    path("", views.LeadsRootView.as_view(), name="ping"),
-    # Later phases append their viewset routers below.
-]
+router = DefaultRouter()
+router.register("", views.LeadViewSet, basename="lead")
+
+urlpatterns = router.urls

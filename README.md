@@ -1,27 +1,31 @@
 # OutreachOS
 
-**B2B Lead Outreach & CRM SaaS — Phase 1 foundation.**
+**B2B Lead Outreach & CRM SaaS — Phase 1 foundation + Phase 2 lead database.**
 
 OutreachOS will eventually import large business datasets (names, contacts, e-mails,
 phone numbers, websites, industries, cities, states), qualify leads, generate
 personalised B2B outreach e-mails, deliver them over SMTP with a hard limit of
 **90 marketing e-mails per day**, and manage the resulting conversations in a CRM.
 
-This repository currently contains **Phase 1: the project foundation and a
-professional dashboard frontend**. No outreach, import, AI or CRM business logic
-is implemented yet — on purpose.
+This repository currently contains **Phase 1 (project foundation and the
+dashboard) and Phase 2 (the Leads / Companies / Contacts database)**. The
+business database is real and queryable: PostgreSQL models, DRF list/detail
+APIs with search, filtering and ordering, and three database-backed pages.
+Import, outreach, AI and CRM business logic are still deliberately absent.
 
 ---
 
 ## Table of contents
 
 - [What is included in Phase 1](#what-is-included-in-phase-1)
+- [What is included in Phase 2](#what-is-included-in-phase-2)
 - [Tech stack](#tech-stack)
 - [Quick start (Docker Compose)](#quick-start-docker-compose)
 - [Local development without Docker](#local-development-without-docker)
 - [Project structure](#project-structure)
 - [Environment variables](#environment-variables)
-- [API reference (Phase 1)](#api-reference-phase-1)
+- [API reference](#api-reference)
+- [Phase 2 — the lead database](#phase-2--lead-database-leads--companies--contacts)
 - [Frontend architecture](#frontend-architecture)
 - [Testing & quality gates](#testing--quality-gates)
 - [Roadmap](#roadmap)
@@ -45,11 +49,34 @@ is implemented yet — on purpose.
 | Docker Compose stack (frontend, backend, postgres, redis) | ✅ Done |
 | CSV/XLSX import, SMTP sending, AI generation, CRM automation, lead scoring | ⛔ Phase 2+ |
 
-Automated verification at the end of this phase:
+Automated verification at the end of Phase 1:
 
 ```
 backend   16 Django tests passing
 frontend  18 Vitest tests passing · tsc --noEmit clean · eslint clean · vite build clean
+```
+
+---
+
+## What is included in Phase 2
+
+| Area | Status |
+| --- | --- |
+| `Company`, `Contact`, `Lead` models with the exact brief fields, incl. `normalized_name` / `normalized_website` / `normalized_email` / `source_file` / `source_row_number` | ✅ Done |
+| Migrations written **and applied** (`companies`, `contacts`, `leads`) | ✅ Done |
+| Lead status vocabulary (9 values) and e-mail status vocabulary (6 values) as DB enums | ✅ Done |
+| `GET /api/{leads,companies,contacts}/` and `/{id}/` — pagination, search, filtering, ordering | ✅ Done |
+| Leads vocabulary endpoint `GET /api/leads/statuses/` (per-status counts) | ✅ Done |
+| Real Leads table — Business, Contact, Email, Phone, Industry, City, State, Lead Score, Status + search, filters, pagination | ✅ Done |
+| Companies and Contacts pages reading real database rows | ✅ Done |
+| Empty states when no records exist | ✅ Done |
+| CSV/XLSX import, e-mail sending, AI, lead scoring | ⛔ Later phases |
+
+Automated verification at the end of Phase 2:
+
+```
+backend   121 Django tests passing · ruff check + format clean · manage.py check clean
+frontend  34 Vitest tests passing · tsc -b clean · eslint clean · vite build clean
 ```
 
 ---
@@ -181,6 +208,7 @@ lead_mail_crm/
 │   │   ├── asgi.py / wsgi.py
 │   ├── core/                         # shared foundation (no domain logic)
 │   │   ├── models.py                 # TimeStamped / Base / Owned abstract models
+│   │   ├── normalization.py          # name / domain / e-mail / phone normalization
 │   │   ├── pagination.py  permissions.py  exceptions.py  utils.py
 │   │   ├── serializers.py
 │   │   ├── views.py                  # API root, health, ready, version
@@ -188,9 +216,9 @@ lead_mail_crm/
 │   │   └── tests/                    # health + auth tests
 │   ├── apps/                         # one bounded context per module
 │   │   ├── accounts/                 # ✅ user model + token auth (register/login/me/logout)
-│   │   ├── companies/                # ⛔ registered, routed, empty
-│   │   ├── contacts/                 # ⛔ registered, routed, empty
-│   │   ├── leads/                    # ⛔ registered, routed, empty
+│   │   ├── companies/                # ✅ Company model + read-only API + filters
+│   │   ├── contacts/                 # ✅ Contact model + read-only API + filters
+│   │   ├── leads/                    # ✅ Lead model + API, vocabulary, seed command
 │   │   ├── imports/                  # ⛔ registered, routed, empty
 │   │   ├── campaigns/                # ⛔ registered, routed, empty
 │   │   ├── email_engine/             # ⛔ registered, routed, empty
@@ -211,14 +239,15 @@ lead_mail_crm/
 │   │   │   ├── charts/               # SVG Sparkline, CapacityGauge, SourceDonut, MiniBarChart
 │   │   │   └── feedback/             # EmptyState, ErrorState, LoadingState, ErrorBoundary
 │   │   ├── features/dashboard/       # dashboard-specific components
-│   │   ├── pages/                    # DashboardPage, SettingsPage, ModulePlaceholderPage, 404
+│   │   ├── features/leads/           # LeadTable (9 columns), table page skeleton
+│   │   ├── pages/                    # Dashboard, Leads, Companies, Contacts, Settings, placeholders, 404
 │   │   ├── routes/                   # AppRoutes (lazy-loaded), paths.ts
-│   │   ├── services/                 # data access — the mock ↔ API switch point
-│   │   ├── hooks/                    # useDashboardOverview, useTheme, useMediaQuery, …
-│   │   ├── data/mock/                # Phase 1 placeholder dataset (UI only)
+│   │   ├── services/                 # data access — dashboard mock ↔ API switch, real lead APIs
+│   │   ├── hooks/                    # useLeads/useCompanies/useContacts, list query state, theme, …
+│   │   ├── data/mock/                # dashboard placeholder dataset (UI only)
 │   │   ├── config/                   # navigation, module registry, status maps, colours
 │   │   ├── lib/                      # api client, env access, formatting, query client
-│   │   └── types/                    # API + dashboard contracts
+│   │   └── types/                    # API + dashboard + lead/company/contact contracts
 │   ├── nginx/default.conf            # production SPA + /api proxy
 │   ├── Dockerfile                    # development + build + production targets
 │   └── vite.config.ts · vitest.config.ts · eslint.config.js
@@ -270,7 +299,7 @@ Only `VITE_*` variables are exposed to the browser.
 
 ---
 
-## API reference (Phase 1)
+## API reference
 
 | Method | Endpoint | Description |
 | --- | --- | --- |
@@ -282,8 +311,42 @@ Only `VITE_*` variables are exposed to the browser.
 | `POST` | `/api/v1/accounts/login/` | Token login |
 | `POST` | `/api/v1/accounts/logout/` | Invalidate the token (authenticated) |
 | `GET` | `/api/v1/accounts/me/` | Current user (authenticated) |
-| `GET` | `/api/v1/{companies,contacts,leads,imports,campaigns,email,ai,crm,analytics,suppression}/` | Module status stubs — return `{"status": "not_implemented", …}` so every planned route already resolves |
+| `GET` | `/api/v1/{imports,campaigns,email,ai,crm,analytics,suppression}/` | Module status stubs — return `{"status": "not_implemented", …}` so every planned route already resolves |
 | `GET` | `/api/schema/`, `/api/docs/` | OpenAPI schema + Swagger UI (DEBUG only) |
+
+### Phase 2 — lead database (leads / companies / contacts)
+
+Read-only collections backed by PostgreSQL. Every route is exposed both under
+the canonical versioned prefix and under the unversioned alias from the brief
+(`/api/leads/` ≡ `/api/v1/leads/`, same viewsets, same payloads).
+
+| Method | Endpoint | Description |
+| --- | --- | --- |
+| `GET` | `/api/leads/` · `/api/v1/leads/` | Paginated lead list — `{count, next, previous, results}` |
+| `GET` | `/api/leads/{id}/` | Single lead (company + contact context included) |
+| `GET` | `/api/leads/statuses/` | Lead-status vocabulary with per-status counts |
+| `GET` | `/api/companies/` | Company list, with `lead_count` / `contact_count` |
+| `GET` | `/api/companies/{id}/` | Single company |
+| `GET` | `/api/companies/status/` | Module status + totals |
+| `GET` | `/api/contacts/` | Contact list, with company context |
+| `GET` | `/api/contacts/{id}/` | Single contact |
+| `GET` | `/api/contacts/status/` | Module status + totals |
+
+Query parameters shared by all three lists: `page`, `page_size`, `search`,
+`ordering`. Filters — leads: `lead_status` (repeatable or CSV), `email_status`,
+`source`, `company`, `contact`, `industry`, `city`, `state`, `country`,
+`min_score`, `max_score`, `has_email`, `is_contactable`, `created_after`,
+`created_before`; companies: `industry`, `state`, `city`, `country`, `source`,
+`domain`, `employee_count_min`, `employee_count_max`, `has_website`; contacts:
+`company`, `job_title`, `phone_type`, `city`, `state`, `industry`, `source`,
+`has_email`.
+
+Lead statuses: `NEW`, `QUALIFIED`, `CONTACTED`, `REPLIED`, `MEETING`,
+`PROPOSAL`, `WON`, `LOST`, `DO_NOT_CONTACT`. E-mail statuses: `UNKNOWN`,
+`VALID`, `INVALID`, `BOUNCED`, `UNSUBSCRIBED`, `SUPPRESSED`.
+
+Development data: `python manage.py seed_lead_data` (add `--flush` to reset,
+`--flush --empty` to leave the tables empty and exercise the empty states).
 
 Errors always use one envelope:
 
@@ -335,10 +398,13 @@ active, and the settings page reports which data source is in use.
 `/email` · `/follow-ups` · `/crm` · `/analytics` · `/templates` · `/ai` ·
 `/suppression` · `/settings`
 
-Only `/dashboard` is functional; `/settings` is a small but real surface (theme,
-UI preferences, API connectivity diagnostics). Every other module renders a
-professional placeholder describing its planned scope, data columns and API path —
-the navigation, routing and layout are final, only the business logic is pending.
+`/dashboard` is functional, `/settings` is a small but real surface (theme, UI
+preferences, API connectivity diagnostics), and `/leads`, `/companies` and
+`/contacts` are **backed by the live PostgreSQL database** (Phase 2): search,
+filters, sortable headers, pagination, loading / empty / error states. Every
+remaining module renders a professional placeholder describing its planned scope,
+data columns and API path — the navigation, routing and layout are final, only the
+business logic is pending.
 
 ---
 
@@ -359,11 +425,17 @@ cd frontend && npm run lint          # ESLint (React 19 rules)
 cd frontend && npm run build
 ```
 
-Current state: **16 Django tests**, **18 frontend tests**, typecheck, lint and
+Current state: **121 Django tests**, **34 frontend tests**, typecheck, lint and
 build all pass.
 
+Backend tests cover health/readiness, auth, the normalization helpers, model
+constraints, the seed command and every list/detail/filter/ordering behaviour of
+the leads, companies and contacts APIs.
+
 Frontend tests cover the dashboard (KPI cards, `0 / 90` capacity, all five
-required sections, empty states, error + retry) and every route in the sidebar.
+required sections, empty states, error + retry), every route in the sidebar, and
+the three database-backed pages (columns, rows, search, filters, pagination,
+empty/error states).
 
 ---
 
@@ -371,8 +443,9 @@ required sections, empty states, error + retry) and every route in the sidebar.
 
 Later phases, in the order the codebase is prepared for them:
 
-1. **Data ingestion** — `companies`, `contacts`, `leads`, `imports`: CSV/XLSX
-   upload, column mapping, chunked Celery processing, deduplication.
+1. **Data ingestion** — extend `imports`: CSV/XLSX upload, column mapping,
+   chunked Celery processing, deduplication into the `companies` / `contacts` /
+   `leads` tables that Phase 2 already provides.
 2. **Qualification** — lead scoring and AI-assisted qualification (`ai_engine`).
 3. **Campaigns & sending** — sequences, SMTP mailboxes, the enforced
    **90 e-mails/day** budget, bounce handling (`campaigns`, `email_engine`,
@@ -381,8 +454,10 @@ Later phases, in the order the codebase is prepared for them:
 5. **Analytics** — aggregation tables feeding the dashboard cards (`analytics`),
    with the dashboard switching to the live API via `VITE_USE_MOCK_DATA=false`.
 
-Deliberately **not** implemented in Phase 1: CSV/XLSX import, SMTP sending, AI
-generation, campaign execution, lead scoring and CRM automation.
+Deliberately **not** implemented yet: CSV/XLSX import, SMTP sending, AI
+generation, campaign execution, lead scoring and CRM automation. `lead_score`
+exists as a stored integer on `Lead` (0–100, settable via API/seed) — there is no
+scoring algorithm behind it.
 
 ---
 
@@ -397,10 +472,12 @@ fails, check credentials match between `.env` and the `postgres` service, then
 Change the host-side mappings in `.env` (`POSTGRES_HOST_PORT`,
 `REDIS_HOST_PORT`, `BACKEND_HOST_PORT`, `FRONTEND_HOST_PORT`).
 
-**Frontend shows "API offline"**
+**Frontend shows "API offline" / the Leads, Companies or Contacts pages error**
 Expected when only the frontend is running: the dashboard still renders the
-placeholder dataset. Start the backend (`docker compose up backend`) or point
-`VITE_PROXY_TARGET` at a running Django instance.
+mock dataset, but `/leads`, `/companies` and `/contacts` always read the real
+API. Start the backend (`docker compose up backend` or `python manage.py
+runserver`) or point `VITE_PROXY_TARGET` at a running Django instance. If the
+database is empty, seed it with `python manage.py seed_lead_data`.
 
 **Blank page after deploying the production frontend image**
 The SPA needs history fallback — `nginx/default.conf` already contains

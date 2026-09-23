@@ -1,14 +1,18 @@
-"""Routes for ``/api/v1/contacts/``."""
+"""Routes for ``/api/v1/contacts/``.
+
+The collection lives at the bare path (``GET /api/v1/contacts/``) and detail
+endpoints at ``/api/v1/contacts/{id}/``; ``/status/`` is a module summary.
+"""
 
 from __future__ import annotations
 
-from django.urls import path
+from rest_framework.routers import DefaultRouter
 
 from apps.contacts import views
 
 app_name = "contacts"
 
-urlpatterns = [
-    path("", views.ContactsRootView.as_view(), name="ping"),
-    # Later phases append their viewset routers below.
-]
+router = DefaultRouter()
+router.register("", views.ContactViewSet, basename="contact")
+
+urlpatterns = router.urls

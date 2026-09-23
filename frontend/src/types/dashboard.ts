@@ -37,18 +37,11 @@ export interface MetricCardData {
   hint?: string;
 }
 
-export type LeadStatus =
-  | 'new'
-  | 'validated'
-  | 'qualified'
-  | 'contacted'
-  | 'replied'
-  | 'meeting'
-  | 'won'
-  | 'lost'
-  | 'unqualified';
+// Lead/email statuses come from the API contract so the dashboard, the lead
+// table and Django all speak one vocabulary (see types/lead.ts).
+import type { EmailStatus, LeadStatus } from './lead';
 
-export type EmailStatus = 'valid' | 'risky' | 'invalid' | 'unknown';
+export type { EmailStatus, LeadStatus };
 
 export interface LeadRow {
   id: string;

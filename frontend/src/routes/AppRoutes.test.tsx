@@ -38,10 +38,8 @@ vi.mock('@/services/health.service', () => ({
   fetchHealth: vi.fn().mockRejectedValue(new Error('offline')),
 }));
 
-const routes: Array<[string, string]> = [
-  ['/leads', 'Leads'],
-  ['/companies', 'Companies'],
-  ['/contacts', 'Contacts'],
+// Modules that still render the shared placeholder page.
+const placeholderRoutes: Array<[string, string]> = [
   ['/imports', 'Imports'],
   ['/campaigns', 'Campaigns'],
   ['/email', 'Email'],
@@ -54,7 +52,7 @@ const routes: Array<[string, string]> = [
 ];
 
 describe('routing', () => {
-  it.each(routes)('renders the %s placeholder module', async (path, heading) => {
+  it.each(placeholderRoutes)('renders the %s placeholder module', async (path, heading) => {
     renderWithProviders(<AppRoutes />, { route: path });
 
     expect(

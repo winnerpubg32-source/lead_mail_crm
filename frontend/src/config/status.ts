@@ -2,12 +2,8 @@ import { Ban, CheckCheck, CircleSlash, Mail, MailCheck, MailWarning, Send, Spark
 import type { LucideIcon } from 'lucide-react';
 
 import type { BadgeTone } from '@/components/ui/Badge';
-import type {
-  CampaignStatus,
-  EmailStatus,
-  LeadStatus,
-  OutreachEventType,
-} from '@/types/dashboard';
+import type { CampaignStatus, OutreachEventType } from '@/types/dashboard';
+import type { EmailStatus, LeadStatus, PhoneType } from '@/types/lead';
 
 /**
  * Presentation metadata for every domain enum.
@@ -22,24 +18,49 @@ export interface StatusPresentation {
   tone: BadgeTone;
 }
 
+/** Pipeline statuses — keys match `apps.leads.models.LeadStatus` exactly. */
 export const leadStatusConfig: Record<LeadStatus, StatusPresentation> = {
-  new: { label: 'New', tone: 'neutral' },
-  validated: { label: 'Validated', tone: 'info' },
-  qualified: { label: 'Qualified', tone: 'violet' },
-  contacted: { label: 'Contacted', tone: 'brand' },
-  replied: { label: 'Replied', tone: 'success' },
-  meeting: { label: 'Meeting', tone: 'success' },
-  won: { label: 'Won', tone: 'success' },
-  lost: { label: 'Lost', tone: 'danger' },
-  unqualified: { label: 'Unqualified', tone: 'neutral' },
+  NEW: { label: 'New', tone: 'neutral' },
+  QUALIFIED: { label: 'Qualified', tone: 'violet' },
+  CONTACTED: { label: 'Contacted', tone: 'brand' },
+  REPLIED: { label: 'Replied', tone: 'info' },
+  MEETING: { label: 'Meeting', tone: 'success' },
+  PROPOSAL: { label: 'Proposal', tone: 'warning' },
+  WON: { label: 'Won', tone: 'success' },
+  LOST: { label: 'Lost', tone: 'danger' },
+  DO_NOT_CONTACT: { label: 'Do not contact', tone: 'neutral' },
 };
 
+/** Deliverability statuses — keys match `apps.leads.models.EmailStatus`. */
 export const emailStatusConfig: Record<EmailStatus, StatusPresentation> = {
-  valid: { label: 'Valid', tone: 'success' },
-  risky: { label: 'Risky', tone: 'warning' },
-  invalid: { label: 'Invalid', tone: 'danger' },
-  unknown: { label: 'Unknown', tone: 'neutral' },
+  UNKNOWN: { label: 'Unknown', tone: 'neutral' },
+  VALID: { label: 'Valid', tone: 'success' },
+  INVALID: { label: 'Invalid', tone: 'danger' },
+  BOUNCED: { label: 'Bounced', tone: 'danger' },
+  UNSUBSCRIBED: { label: 'Unsubscribed', tone: 'warning' },
+  SUPPRESSED: { label: 'Suppressed', tone: 'neutral' },
 };
+
+export const phoneTypeLabels: Record<PhoneType, string> = {
+  UNKNOWN: 'Unknown',
+  MOBILE: 'Mobile',
+  LANDLINE: 'Landline',
+  OFFICE: 'Office',
+  OTHER: 'Other',
+};
+
+/** Statuses shown as the primary pipeline filter on the leads page. */
+export const primaryLeadStatusOrder: LeadStatus[] = [
+  'NEW',
+  'QUALIFIED',
+  'CONTACTED',
+  'REPLIED',
+  'MEETING',
+  'PROPOSAL',
+  'WON',
+  'LOST',
+  'DO_NOT_CONTACT',
+];
 
 export const campaignStatusConfig: Record<CampaignStatus, StatusPresentation> = {
   draft: { label: 'Draft', tone: 'neutral' },

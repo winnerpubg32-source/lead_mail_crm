@@ -16,49 +16,12 @@ export interface ModuleConfig {
   djangoApp: string;
 }
 
+/**
+ * Registry for the modules that still render the shared placeholder page.
+ * Leads, Companies and Contacts were implemented in Phase 2 and now have real
+ * pages (`src/pages/{LeadsPage,CompaniesPage,ContactsPage}.tsx`).
+ */
 export const dataColumns = {
-  leads: {
-    title: 'Leads',
-    description:
-      'Qualified prospects with qualification scores, outreach status and full activity history.',
-    capabilities: [
-      'Lead pipeline with drag-free status transitions (new → qualified → contacted → replied → meeting)',
-      'Qualification inputs: industry fit, company size, role seniority and e-mail validity',
-      'Bulk actions: assign, suppress, push to campaign, export',
-      'Filters for state, city, industry, source and score range',
-    ],
-    columns: ['Lead', 'Company', 'Contact', 'E-mail', 'Score', 'Status', 'Owner', 'Last activity'],
-    apiPath: '/api/v1/leads/',
-    djangoApp: 'leads',
-  },
-  companies: {
-    title: 'Companies',
-    description:
-      'The imported business database: names, websites, industries, cities and states, deduplicated by domain.',
-    capabilities: [
-      'Company records with normalised domain, industry and location fields',
-      'Domain-level deduplication when importing large datasets',
-      'Contact and lead roll-ups per company',
-      'Segments by industry, state, city and employee range',
-    ],
-    columns: ['Company', 'Domain', 'Industry', 'City', 'State', 'Contacts', 'Leads', 'Website'],
-    apiPath: '/api/v1/companies/',
-    djangoApp: 'companies',
-  },
-  contacts: {
-    title: 'Contacts',
-    description:
-      'People behind each company: names, job titles, e-mail addresses, phone numbers and verification status.',
-    capabilities: [
-      'Contact records linked to companies and leads',
-      'E-mail normalisation plus valid / risky / invalid verification states',
-      'Decision-maker tagging for seniority-based targeting',
-      'Phone number storage and formatting',
-    ],
-    columns: ['Name', 'Job title', 'Company', 'E-mail', 'Phone', 'E-mail status', 'LinkedIn', 'Source'],
-    apiPath: '/api/v1/contacts/',
-    djangoApp: 'contacts',
-  },
   imports: {
     title: 'Imports',
     description:

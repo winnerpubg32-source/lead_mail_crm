@@ -1,32 +1,83 @@
 """
-Leads API views — placeholder for a later phase.
+Leads API.
+
+``GET /api/v1/leads/``            — paginated, searchable, filterable list
+``GET /api/v1/leads/{id}/``       — detail
+``GET /api/v1/leads/statuses/``   — enum vocabulary for the UI filters
 """
 
 from __future__ import annotations
 
-from drf_spectacular.utils import extend_schema
+from django.db.models import Count
+from drf_spectacular.utils import extend_schema, extend_schema_view
+from rest_framework import viewsets
+from rest_framework.decorators import action
+from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
-from rest_framework.views import APIView
+
+from apps.leads.filters import LeadFilter
+from apps.leads.models import EmailStatus, Lead, LeadStatus
+from apps.leads.serializers import LeadListSerializer, LeadSerializer, status_choices
 
 
-class LeadsRootView(APIView):
-    """``GET /api/v1/leads/`` — reports that the module is registered but empty."""
+@extend_schema_view(
+    list=extend_schema(summary="List leads", tags=["leads"]),
+    retrieve=extend_schema(summary="Retrieve a lead", tags=["leads"]),
+    statuses=extend_schema(summary="Lead + e-mail status vocabulary", tags=["leads"]),
+)
+class LeadViewSet(viewsets.ReadOnlyModelViewSet):
+    """
+    Read-only lead endpoints.
 
-    authentication_classes: tuple = ()
-    permission_classes: tuple = ()
+    The table's columns come from the company/contact relations, so the
+    queryset is always joined to avoid N+1 queries.
+    """
 
-    @extend_schema(responses={200: None}, summary="Leads module status")
-    def get(self, request):
-        return Response(
-            {
-                "module": "leads",
-                "status": "not_implemented",
-                "phase": 1,
-                "message": "Foundation only. Leads ships in a later phase.",
-                "planned": [
-                    "Lead model with status pipeline and qualification signals",
-                    "Lead scoring inputs from the AI engine",
-                    "Assignment / ownership rules",
-                ],
-            }
-        )
+    permission_classes = (AllowAny,)
+    filterset_class = LeadFilter
+    search_fields = (
+        "company__name",
+        "company__normalized_name",
+        "company__normalized_website",
+        "contact__full_name",
+        "contact__email",
+        "contact__job_title",
+        "source",
+        "source_file",
+    )
+    ordering_fields = (
+        "lead_score",
+        "lead_status",
+        "email_status",
+        "company__name",
+        "contact__full_name",
+        "created_at",
+        "updated_at",
+    )
+    ordering = ("-lead_score", "-created_at")
+
+    def get_queryset(self):
+        return Lead.objects.select_related("company", "contact")
+
+    def get_serializer_class(self):
+        return LeadListSerializer if self.action == "list" else LeadSerializer
+
+    @action(detail=False, methods=["get"], url_path="statuses")
+    def statuses(self, request):
+        """Enum values + labels, plus counts per status for the filter chips."""
+        counts = {
+            row["lead_status"]: row["total"]
+            for row in Lead.objects.values("lead_status").annotate(total=Count("id"))
+        }
+        email_counts = {
+            row["email_status"]: row["total"]
+            for row in Lead.objects.values("email_status").annotate(total=Count("id"))
+        }
+        payload = status_choices()
+        for entry in payload["lead_status"]:
+            entry["count"] = counts.get(entry["value"], 0)
+        for entry in payload["email_status"]:
+            entry["count"] = email_counts.get(entry["value"], 0)
+        payload["total"] = Lead.objects.count()
+        payload["defaults"] = {"lead_status": LeadStatus.NEW, "email_status": EmailStatus.UNKNOWN}
+        return Response(payload)
