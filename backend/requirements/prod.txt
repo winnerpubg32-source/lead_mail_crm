@@ -1,0 +1,2 @@
+# Production image dependencies (kept identical to base for Phase 1).
+-r base.txt

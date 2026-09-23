@@ -1,0 +1,27 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+htmlcov/
+.coverage
+coverage.xml
+
+# Django
+staticfiles/
+media/
+*.log
+.env
+.env.*
+!.env.example
+db.sqlite3
+
+# tooling
+.git/
+.gitignore
+.idea/
+.vscode/

@@ -1,0 +1,13 @@
+node_modules
+dist
+dist-ssr
+coverage
+.vite
+.env
+.env.local
+.env.*.local
+*.log
+.git
+.gitignore
+.idea
+.vscode
