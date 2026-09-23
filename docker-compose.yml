@@ -1,0 +1,198 @@
+# ---------------------------------------------------------------------------
+# OutreachOS — development stack
+#
+#   docker compose up --build
+#
+# Services started by default:  frontend · backend · postgres · redis
+#
+# Celery worker + beat are available behind an opt-in profile (they have no
+# tasks until the import/outreach phases):
+#
+#   docker compose --profile workers up --build
+#
+# Dashboard:  http://localhost:5173
+# API:        http://localhost:8000/api/health/
+# Admin:      http://localhost:8000/admin/
+# ---------------------------------------------------------------------------
+
+name: outreachos
+
+services:
+  # ----------------------------- database --------------------------------
+  postgres:
+    image: postgres:16-alpine
+    container_name: outreachos-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-outreachos}
+      POSTGRES_USER: ${POSTGRES_USER:-outreachos}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-outreachos}
+      PGDATA: /var/lib/postgresql/data/pgdata
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - '${POSTGRES_HOST_PORT:-5432}:5432'
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-outreachos} -d ${POSTGRES_DB:-outreachos}']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    networks: [outreachos]
+
+  # ------------------------------- cache ---------------------------------
+  redis:
+    image: redis:7-alpine
+    container_name: outreachos-redis
+    restart: unless-stopped
+    command: ['redis-server', '--appendonly', 'yes', '--save', '60', '1']
+    volumes:
+      - redis_data:/data
+    ports:
+      - '${REDIS_HOST_PORT:-6379}:6379'
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
+    networks: [outreachos]
+
+  # ------------------------------ backend --------------------------------
+  backend:
+    build:
+      context: ./backend
+      target: development
+    container_name: outreachos-backend
+    restart: unless-stopped
+    command: python manage.py runserver 0.0.0.0:8000
+    environment:
+      DJANGO_SETTINGS_MODULE: ${DJANGO_SETTINGS_MODULE:-config.settings.development}
+      DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:-insecure-compose-key-change-me}
+      DJANGO_DEBUG: ${DJANGO_DEBUG:-true}
+      DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS:-*}
+      CORS_ALLOW_ALL_ORIGINS: ${CORS_ALLOW_ALL_ORIGINS:-true}
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: ${POSTGRES_DB:-outreachos}
+      POSTGRES_USER: ${POSTGRES_USER:-outreachos}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-outreachos}
+      REDIS_URL: redis://redis:6379/0
+      CELERY_BROKER_URL: redis://redis:6379/1
+      CELERY_RESULT_BACKEND: redis://redis:6379/2
+      OUTREACH_DAILY_EMAIL_LIMIT: ${OUTREACH_DAILY_EMAIL_LIMIT:-90}
+      DJANGO_LOG_LEVEL: ${DJANGO_LOG_LEVEL:-INFO}
+    volumes:
+      # Live reload against the host source tree; the named volume keeps the
+      # container's site-packages from being shadowed on some platforms.
+      - ./backend:/app
+    ports:
+      - '${BACKEND_HOST_PORT:-8000}:8000'
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ['CMD-SHELL', 'curl -fsS http://127.0.0.1:8000/api/health/ || exit 1']
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks: [outreachos]
+
+  # ------------------------------ frontend -------------------------------
+  frontend:
+    build:
+      context: ./frontend
+      target: development
+    container_name: outreachos-frontend
+    restart: unless-stopped
+    command: npm run dev -- --host 0.0.0.0 --port 5173
+    environment:
+      # Relative API path — the Vite dev server proxies /api to the backend.
+      VITE_API_BASE_URL: /api
+      # Optional absolute API origin — empty keeps requests relative (proxied).
+      VITE_API_URL: ${VITE_API_URL:-}
+      VITE_USE_MOCK_DATA: ${VITE_USE_MOCK_DATA:-true}
+      # Inside the compose network the backend is not localhost.
+      VITE_PROXY_TARGET: http://backend:8000
+      VITE_PORT: '5173'
+    volumes:
+      - ./frontend:/app
+      - frontend_node_modules:/app/node_modules
+    ports:
+      - '${FRONTEND_HOST_PORT:-5173}:5173'
+    depends_on:
+      backend:
+        condition: service_started
+    networks: [outreachos]
+
+  # ------------------------- background workers --------------------------
+  # Opt-in: docker compose --profile workers up --build
+  celery-worker:
+    profiles: ['workers']
+    build:
+      context: ./backend
+      target: development
+    container_name: outreachos-celery-worker
+    restart: unless-stopped
+    entrypoint: ['/app/scripts/celery-entrypoint.sh']
+    command: ['celery', '-A', 'config', 'worker', '-l', 'info', '-Q', 'outreachos']
+    environment:
+      DJANGO_SETTINGS_MODULE: ${DJANGO_SETTINGS_MODULE:-config.settings.development}
+      DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:-insecure-compose-key-change-me}
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: ${POSTGRES_DB:-outreachos}
+      POSTGRES_USER: ${POSTGRES_USER:-outreachos}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-outreachos}
+      REDIS_URL: redis://redis:6379/0
+      CELERY_BROKER_URL: redis://redis:6379/1
+      CELERY_RESULT_BACKEND: redis://redis:6379/2
+    volumes:
+      - ./backend:/app
+    depends_on:
+      backend:
+        condition: service_started
+      redis:
+        condition: service_healthy
+    networks: [outreachos]
+
+  celery-beat:
+    profiles: ['workers']
+    build:
+      context: ./backend
+      target: development
+    container_name: outreachos-celery-beat
+    restart: unless-stopped
+    entrypoint: ['/app/scripts/celery-entrypoint.sh']
+    command: ['celery', '-A', 'config', 'beat', '-l', 'info']
+    environment:
+      DJANGO_SETTINGS_MODULE: ${DJANGO_SETTINGS_MODULE:-config.settings.development}
+      DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:-insecure-compose-key-change-me}
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: ${POSTGRES_DB:-outreachos}
+      POSTGRES_USER: ${POSTGRES_USER:-outreachos}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-outreachos}
+      REDIS_URL: redis://redis:6379/0
+      CELERY_BROKER_URL: redis://redis:6379/1
+      CELERY_RESULT_BACKEND: redis://redis:6379/2
+    volumes:
+      - ./backend:/app
+    depends_on:
+      backend:
+        condition: service_started
+      redis:
+        condition: service_healthy
+    networks: [outreachos]
+
+volumes:
+  postgres_data:
+  redis_data:
+  frontend_node_modules:
+
+networks:
+  outreachos:
+    driver: bridge

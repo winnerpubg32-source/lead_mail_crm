@@ -1,0 +1,8 @@
+# Local development & CI tooling.
+-r base.txt
+
+pytest==9.0.1
+pytest-django==4.12.0
+coverage==7.11.0
+ruff==0.15.0
+django-extensions==4.1

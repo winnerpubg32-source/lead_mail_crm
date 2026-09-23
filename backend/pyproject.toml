@@ -1,0 +1,42 @@
+# ---------------------------------------------------------------------------
+# Backend tooling configuration (linting, formatting, tests).
+# Runtime dependencies live in requirements/*.txt.
+# ---------------------------------------------------------------------------
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+extend-exclude = ["**/migrations/*", ".venv", "staticfiles"]
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes
+    "I",   # import sorting
+    "B",   # flake8-bugbear
+    "C4",  # comprehensions
+    "DJ",  # flake8-django
+    "UP",  # pyupgrade
+    "SIM", # simplify
+    "RUF", # ruff-specific
+]
+ignore = [
+    "E501",  # line length is handled by the formatter
+    "B008",  # Django/DRF settings legitimately call functions in defaults
+]
+
+[tool.ruff.lint.per-file-ignores]
+"config/settings/*.py" = ["F403", "F405"]  # star imports are the Django convention
+"core/tests/*" = ["S101"]
+"**/tests/*" = ["S101"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+
+[tool.pytest.ini_options]
+DJANGO_SETTINGS_MODULE = "config.settings.development"
+python_files = ["test_*.py", "*_tests.py", "tests.py"]
+testpaths = ["core", "apps"]
+addopts = "-ra --strict-markers"
