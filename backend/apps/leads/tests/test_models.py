@@ -24,6 +24,7 @@ class LeadEnumTests(TestCase):
                 "WON",
                 "LOST",
                 "DO_NOT_CONTACT",
+                "MERGED",
             ],
         )
 

@@ -5,12 +5,17 @@ from __future__ import annotations
 from django.test import SimpleTestCase
 
 from core.normalization import (
+    address_key,
     build_full_name,
     company_name_key,
+    normalize_address,
     normalize_company_name,
+    normalize_contact_name,
     normalize_domain,
     normalize_email,
+    normalize_name_case,
     normalize_phone,
+    normalize_state,
     normalize_whitespace,
     split_full_name,
 )
@@ -109,3 +114,68 @@ class NameTests(SimpleTestCase):
 
     def test_split_full_name_handles_blank(self) -> None:
         self.assertEqual(split_full_name(None), ("", ""))
+
+
+class ContactNameTests(SimpleTestCase):
+    def test_lowercases_and_strips_punctuation(self) -> None:
+        self.assertEqual(
+            normalize_contact_name(" Dr.  Maria", "O'Brien"), "maria o brien"
+        )
+
+    def test_folds_accents(self) -> None:
+        self.assertEqual(normalize_contact_name("José", "García"), "jose garcia")
+
+    def test_blank_input(self) -> None:
+        self.assertEqual(normalize_contact_name(None, None), "")
+        self.assertEqual(normalize_contact_name("", ""), "")
+
+
+class AddressTests(SimpleTestCase):
+    def test_strips_punctuation_and_abbrev(self) -> None:
+        self.assertEqual(
+            normalize_address("123 Main Street", "Columbus", "OH", "43215"),
+            "123 main st columbus oh 43215",
+        )
+
+    def test_shortens_suffixes(self) -> None:
+        self.assertEqual(
+            normalize_address("456 Elm Avenue, Suite 200", "Austin", "Texas"),
+            "456 elm ave ste 200 austin tx",
+        )
+
+    def test_same_address_regardless_of_format(self) -> None:
+        a = normalize_address("123 Main St.", "Columbus", "OH")
+        b = normalize_address("123 Main Street", "columbus", "ohio")
+        self.assertEqual(a, b)
+
+    def test_address_key_collapses_whitespace(self) -> None:
+        a = address_key("123 Main St", "Columbus", "OH")
+        b = address_key("  123  Main   Street  ", "COLUMBUS", "Ohio")
+        self.assertEqual(a, b)
+
+    def test_blank_input(self) -> None:
+        self.assertEqual(normalize_address(), "")
+        self.assertEqual(address_key(None, None, None), "")
+
+
+class StateTests(SimpleTestCase):
+    def test_expands_full_names(self) -> None:
+        self.assertEqual(normalize_state("ohio"), "OH")
+        self.assertEqual(normalize_state("California"), "CA")
+        self.assertEqual(normalize_state("  new YORK  "), "NY")
+
+    def test_passes_through_short_codes(self) -> None:
+        self.assertEqual(normalize_state("OH"), "OH")
+        self.assertEqual(normalize_state("ca"), "CA")
+
+    def test_unknown(self) -> None:
+        self.assertEqual(normalize_state("Ontario"), "Ontario")
+
+
+class NameCaseTests(SimpleTestCase):
+    def test_title_cases(self) -> None:
+        self.assertEqual(normalize_name_case("jane smith"), "Jane Smith")
+
+    def test_blank(self) -> None:
+        self.assertEqual(normalize_name_case(None), "")
+        self.assertEqual(normalize_name_case(""), "")

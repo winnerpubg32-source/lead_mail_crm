@@ -49,16 +49,17 @@ class HealthEndpointTests(TestCase):
 class UrlResolutionTests(TestCase):
     """Every domain module must be routed — implemented or still a stub."""
 
-    #: Modules with real endpoints (Phase 2) and the route that proves it.
+    #: Modules with real endpoints and the route that proves it.
     IMPLEMENTED_MODULES: tuple[tuple[str, str], ...] = (
         ("companies", "companies:company-list"),
         ("contacts", "contacts:contact-list"),
         ("leads", "leads:lead-list"),
+        ("imports", "imports:importjob-list"),
+        ("data_quality", "data_quality:ping"),
     )
 
     #: Modules that are registered and routed but ship in a later phase.
     STUB_MODULES = (
-        "imports",
         "campaigns",
         "email_engine",
         "ai_engine",
@@ -123,6 +124,8 @@ class UrlResolutionTests(TestCase):
             "/api/v1/contacts/",
             "/api/v1/leads/",
             "/api/v1/imports/",
+            "/api/v1/data-quality/",
+            "/api/v1/data-quality/stats/",
             "/api/v1/suppression/",
             "/api/companies/",
             "/api/contacts/",

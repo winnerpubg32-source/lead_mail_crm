@@ -76,6 +76,7 @@ LOCAL_APPS = [
     "apps.contacts",
     "apps.leads",
     "apps.imports",
+    "apps.data_quality",
     "apps.campaigns",
     "apps.email_engine",
     "apps.ai_engine",

@@ -57,7 +57,13 @@ class LeadViewSet(viewsets.ReadOnlyModelViewSet):
     ordering = ("-lead_score", "-created_at")
 
     def get_queryset(self):
-        return Lead.objects.select_related("company", "contact")
+        # By default hide merged records so they don't pollute the pipeline.
+        # Callers can pass ``?include_merged=true`` or filter explicitly to
+        # retrieve them.
+        qs = Lead.objects.select_related("company", "contact")
+        if self.request.query_params.get("include_merged") != "true":
+            qs = qs.exclude(lead_status=LeadStatus.MERGED)
+        return qs
 
     def get_serializer_class(self):
         return LeadListSerializer if self.action == "list" else LeadSerializer
@@ -65,19 +71,20 @@ class LeadViewSet(viewsets.ReadOnlyModelViewSet):
     @action(detail=False, methods=["get"], url_path="statuses")
     def statuses(self, request):
         """Enum values + labels, plus counts per status for the filter chips."""
+        base = Lead.objects.exclude(lead_status=LeadStatus.MERGED)
         counts = {
             row["lead_status"]: row["total"]
-            for row in Lead.objects.values("lead_status").annotate(total=Count("id"))
+            for row in base.values("lead_status").annotate(total=Count("id"))
         }
         email_counts = {
             row["email_status"]: row["total"]
-            for row in Lead.objects.values("email_status").annotate(total=Count("id"))
+            for row in base.values("email_status").annotate(total=Count("id"))
         }
         payload = status_choices()
         for entry in payload["lead_status"]:
             entry["count"] = counts.get(entry["value"], 0)
         for entry in payload["email_status"]:
             entry["count"] = email_counts.get(entry["value"], 0)
-        payload["total"] = Lead.objects.count()
+        payload["total"] = base.count()
         payload["defaults"] = {"lead_status": LeadStatus.NEW, "email_status": EmailStatus.UNKNOWN}
         return Response(payload)

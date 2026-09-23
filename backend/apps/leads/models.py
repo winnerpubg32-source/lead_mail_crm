@@ -29,6 +29,7 @@ class LeadStatus(models.TextChoices):
     WON = "WON", _("Won")
     LOST = "LOST", _("Lost")
     DO_NOT_CONTACT = "DO_NOT_CONTACT", _("Do not contact")
+    MERGED = "MERGED", _("Merged")
 
 
 class EmailStatus(models.TextChoices):
@@ -93,6 +94,20 @@ class Lead(TimeStampedModel):
     # Provenance for imports (Phase 3): which file and row produced this lead.
     source_file = models.CharField(_("source file"), max_length=255, blank=True)
     source_row_number = models.PositiveIntegerField(_("source row number"), null=True, blank=True)
+
+    # When status=MERGED this points to the lead that absorbed this record.
+    # Kept as a soft foreign key (no DB constraint) so merges can be rolled
+    # back later without a cascade, and the losing lead retains all its
+    # provenance columns.
+    merged_into = models.ForeignKey(
+        "self",
+        on_delete=models.SET_NULL,
+        related_name="merged_from",
+        null=True,
+        blank=True,
+        verbose_name=_("merged into"),
+    )
+    merged_at = models.DateTimeField(_("merged at"), null=True, blank=True)
 
     class Meta:
         verbose_name = _("lead")

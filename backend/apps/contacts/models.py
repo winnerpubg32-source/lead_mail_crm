@@ -15,7 +15,9 @@ from apps.companies.models import Company
 from core.models import TimeStampedModel
 from core.normalization import (
     build_full_name,
+    normalize_contact_name,
     normalize_email,
+    normalize_name_case,
     normalize_phone,
     normalize_whitespace,
 )
@@ -47,6 +49,10 @@ class Contact(TimeStampedModel):
     last_name = models.CharField(_("last name"), max_length=120, blank=True)
     # Denormalised for sorting and for the table's "Contact" column.
     full_name = models.CharField(_("full name"), max_length=255, blank=True, db_index=True)
+    # Matching key — lowercase, stripped, accent-folded.
+    normalized_name = models.CharField(
+        _("normalized name"), max_length=255, blank=True, editable=False, db_index=True
+    )
 
     job_title = models.CharField(_("job title"), max_length=180, blank=True, db_index=True)
 
@@ -71,6 +77,7 @@ class Contact(TimeStampedModel):
         indexes = (
             models.Index(fields=["last_name", "first_name"], name="contact_name_idx"),
             models.Index(fields=["company", "full_name"], name="contact_company_name_idx"),
+            models.Index(fields=["company", "normalized_name"], name="contact_company_norm_name_idx"),
         )
         constraints = (
             # A company cannot hold the same e-mail address twice; contacts
@@ -89,6 +96,12 @@ class Contact(TimeStampedModel):
         self.first_name = normalize_whitespace(self.first_name)
         self.last_name = normalize_whitespace(self.last_name)
 
+        # Light title-casing for cosmetic purposes (never invents data).
+        if self.first_name and self.first_name == self.first_name.lower():
+            self.first_name = normalize_name_case(self.first_name)
+        if self.last_name and self.last_name == self.last_name.lower():
+            self.last_name = normalize_name_case(self.last_name)
+
         computed = build_full_name(self.first_name, self.last_name)
         self.full_name = normalize_whitespace(self.full_name) or computed
 
@@ -96,6 +109,7 @@ class Contact(TimeStampedModel):
         self.email = normalize_whitespace(self.email).lower()
         self.normalized_email = normalize_email(self.email)
         self.normalized_phone = normalize_phone(self.phone)
+        self.normalized_name = normalize_contact_name(self.first_name, self.last_name)
 
         super().save(*args, **kwargs)
 

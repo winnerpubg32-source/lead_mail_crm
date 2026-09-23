@@ -14,9 +14,11 @@ from django.utils.translation import gettext_lazy as _
 
 from core.models import TimeStampedModel
 from core.normalization import (
+    normalize_address,
     normalize_company_name,
     normalize_domain,
     normalize_phone,
+    normalize_state,
     normalize_whitespace,
 )
 
@@ -50,6 +52,11 @@ class Company(TimeStampedModel):
     zip_code = models.CharField(_("zip code"), max_length=20, blank=True)
     country = models.CharField(_("country"), max_length=120, blank=True, default="United States")
 
+    # Normalized address key for duplicate detection (Phase 4).
+    normalized_address = models.CharField(
+        _("normalized address"), max_length=500, blank=True, editable=False, db_index=True
+    )
+
     employee_count = models.PositiveIntegerField(_("employee count"), null=True, blank=True)
 
     source = models.CharField(_("source"), max_length=120, blank=True, db_index=True)
@@ -61,6 +68,8 @@ class Company(TimeStampedModel):
         indexes = (
             models.Index(fields=["state", "city"], name="company_state_city_idx"),
             models.Index(fields=["industry", "state"], name="company_industry_state_idx"),
+            models.Index(fields=["normalized_name", "city", "state"], name="company_name_city_state_idx"),
+            models.Index(fields=["normalized_phone"], name="company_norm_phone_idx"),
         )
         constraints = (
             # One record per domain. Blank domains stay out of the constraint so
@@ -85,9 +94,14 @@ class Company(TimeStampedModel):
         self.normalized_website = normalize_domain(self.website)
         self.normalized_phone = normalize_phone(self.phone)
 
-        for field in ("industry", "sub_industry", "city", "state", "zip_code", "country", "source"):
+        for field in ("industry", "sub_industry", "city", "zip_code", "country", "source"):
             setattr(self, field, normalize_whitespace(getattr(self, field)))
         self.street_address = normalize_whitespace(self.street_address)
+        # Normalize state abbreviation (e.g. "Ohio" -> "OH") when possible.
+        self.state = normalize_state(self.state) if self.state else ""
+        self.normalized_address = normalize_address(
+            self.street_address, self.city, self.state, self.zip_code, self.country
+        )
 
         super().save(*args, **kwargs)
 

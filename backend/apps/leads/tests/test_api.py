@@ -276,7 +276,7 @@ class LeadApiTests(TestCase):
 
         body = response.json()
         self.assertEqual(body["total"], 3)
-        self.assertEqual(len(body["lead_status"]), 9)
+        self.assertEqual(len(body["lead_status"]), 10)
         self.assertEqual(len(body["email_status"]), 6)
 
         qualified = next(item for item in body["lead_status"] if item["value"] == "QUALIFIED")

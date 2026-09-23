@@ -40,6 +40,15 @@ const ImportsPage = lazy(() =>
 const ImportHistoryPage = lazy(() =>
   import('@/pages/ImportHistoryPage').then((module) => ({ default: module.ImportHistoryPage })),
 );
+const DataQualityPage = lazy(() =>
+  import('@/pages/DataQualityPage').then((module) => ({ default: module.DataQualityPage })),
+);
+const DuplicatesPage = lazy(() =>
+  import('@/pages/DuplicatesPage').then((module) => ({ default: module.DuplicatesPage })),
+);
+const MissingEmailPage = lazy(() =>
+  import('@/pages/MissingEmailPage').then((module) => ({ default: module.MissingEmailPage })),
+);
 const ModulePage = lazy(() =>
   import('@/pages/ModulePlaceholderPage').then((module) => ({ default: module.ModulePage })),
 );
@@ -101,6 +110,32 @@ export function AppRoutes() {
           element={
             <Suspense fallback={<TablePageSkeleton />}>
               <ImportHistoryPage />
+            </Suspense>
+          }
+        />
+
+        {/* Data quality — implemented (Phase 4) */}
+        <Route
+          path={paths.dataQuality}
+          element={
+            <Suspense fallback={<TablePageSkeleton />}>
+              <DataQualityPage />
+            </Suspense>
+          }
+        />
+        <Route
+          path={paths.duplicates}
+          element={
+            <Suspense fallback={<TablePageSkeleton />}>
+              <DuplicatesPage />
+            </Suspense>
+          }
+        />
+        <Route
+          path={paths.missingEmail}
+          element={
+            <Suspense fallback={<TablePageSkeleton />}>
+              <MissingEmailPage />
             </Suspense>
           }
         />

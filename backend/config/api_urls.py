@@ -23,6 +23,7 @@ urlpatterns = [
     path("v1/contacts/", include("apps.contacts.urls")),
     path("v1/leads/", include("apps.leads.urls")),
     path("v1/imports/", include("apps.imports.urls")),
+    path("v1/data-quality/", include("apps.data_quality.urls")),
     path("v1/campaigns/", include("apps.campaigns.urls")),
     path("v1/email/", include("apps.email_engine.urls")),
     path("v1/ai/", include("apps.ai_engine.urls")),

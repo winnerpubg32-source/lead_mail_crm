@@ -1,19 +1,19 @@
 # OutreachOS
 
-**B2B Lead Outreach & CRM SaaS — Phase 1 foundation, Phase 2 lead database, Phase 3 data import.**
+**B2B Lead Outreach & CRM SaaS — Phase 1 foundation, Phase 2 lead database, Phase 3 CSV/XLSX import, Phase 4 data quality.**
 
-OutreachOS will eventually import large business datasets (names, contacts, e-mails,
-phone numbers, websites, industries, cities, states), qualify leads, generate
-personalised B2B outreach e-mails, deliver them over SMTP with a hard limit of
-**90 marketing e-mails per day**, and manage the resulting conversations in a CRM.
+OutreachOS imports large business datasets (names, contacts, e-mails, phone
+numbers, websites, industries, cities, states), normalises and deduplicates
+them, and will eventually qualify leads, generate personalised B2B outreach
+e-mails, deliver them over SMTP with a hard limit of **90 marketing e-mails per
+day**, and manage the resulting conversations in a CRM.
 
-This repository currently contains **Phase 1 (project foundation and the
-dashboard), Phase 2 (the Leads / Companies / Contacts database) and Phase 3
-(CSV/XLSX data import)**. The business database is real and queryable — PostgreSQL
-models, DRF list/detail APIs with search, filtering and ordering, three
-database-backed pages — and it can now be filled from real datasets: upload,
-intelligent column mapping, preview, chunked Celery processing and an import
-history. Outreach, AI and CRM business logic are still deliberately absent.
+This repository contains **Phases 1–4**: the dashboard, the Leads / Companies /
+Contacts database, CSV/XLSX upload with column mapping + chunked background
+processing + import history, and data-quality tooling — normalization,
+duplicate detection with confidence-weighted rules, a pairwise merge workflow,
+merge-audit provenance, a missing-e-mail view, and a data-health dashboard.
+Outreach, AI and CRM business logic are still deliberately absent.
 
 ---
 
